@@ -1,0 +1,20 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<head>
+<title>登录</title>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+</head>
+<html>
+<body>
+{% if user.is_authenticated %}
+<img src="/static/uploads/{{ image}}" alt="" width="64px" height="64px">
+{{ user.get_profile }}
+ {% else %}
+        <form action="." method="POST">{% csrf_token %}
+        <div>---------</div>
+        {{ form.as_ul }}
+        <input type="submit" value="YES!">
+        </form>
+        <a href="/login">login again</a>
+{% endif %}
+</body>
+</html>

@@ -1,0 +1,286 @@
+﻿{% extends 'simple.html' %}
+
+{% block js-css %}
+    <script type="text/javascript" src="/static/js/jquery-1.6.4.min.js"></script>
+    <script type="text/javascript" src="/static/js/jquery.autocomplete.min.js"></script>
+    <script type="text/javascript" src="/static/js/jquery.blockUI.js"></script>
+    <script type="text/javascript" src="/static/js/jquery.csrf.js"></script>
+    <script type="text/javascript" src="/static/js/jquery.jgrowl.min.js"></script>
+    <script type="text/javascript" src="/static/js/jquery.pages.js"></script>
+    <script type="text/javascript" src="/static/js/jquery-ui-1.8.16.custom.min.js"></script>
+    <link rel="stylesheet" type="text/css" href="/static/css/jquery-ui-1.8.16.custom.css">
+    <link rel="stylesheet" type="text/css" href="/static/css/jquery.jgrowl.css">
+
+    <script type="text/javascript">
+    function del_item(obj){
+        $(obj).closest("tr").detach();
+        if ($("#cart_tb tbody tr").length<1){
+            $("#pay_btn").attr("disabled",true);
+            $("#cart_div").fadeOut(1000);
+        }
+    }
+     $().ready(function() {
+         var flag = false;
+         thePage = 1;
+ 
+
+         /*Date.prototype.pattern=function(fmt) {
+            var o = {         
+            "M+" : this.getMonth()+1, //月份
+            "d+" : this.getDate(), //日
+            "h+" : this.getHours()%12 == 0 ? 12 : this.getHours()%12, //小时
+            "H+" : this.getHours(), //小时
+            "m+" : this.getMinutes(), //分
+            "s+" : this.getSeconds(), //秒
+            "q+" : Math.floor((this.getMonth()+3)/3), //季度
+            "S" : this.getMilliseconds() //毫秒
+            };
+            var week = {
+            "0" : "\u65e5",
+            "1" : "\u4e00",
+            "2" : "\u4e8c",
+            "3" : "\u4e09",
+            "4" : "\u56db",
+            "5" : "\u4e94",
+            "6" : "\u516d"
+            };
+            if(/(y+)/.test(fmt)){
+                fmt=fmt.replace(RegExp.$1, (this.getFullYear()+"").substr(4 - RegExp.$1.length));
+            }
+            if(/(E+)/.test(fmt)){
+                fmt=fmt.replace(RegExp.$1, ((RegExp.$1.length>1) ? (RegExp.$1.length>2 ? "\u661f\u671f" : "\u5468") : "")+week[this.getDay()+""]);
+            }
+            for(var k in o){
+                if(new RegExp("("+ k +")").test(fmt)){
+                    fmt = fmt.replace(RegExp.$1, (RegExp.$1.length==1) ? (o[k]) : (("00"+ o[k]).substr((""+ o[k]).length)));
+                }
+            }
+    return fmt;
+}*/
+
+         function showErr(msg,callback){
+             $.jGrowl(msg,{header:"系统提示",timeout:5000});
+             !callback || (flag=true);
+         }
+         //$("#date_start_input").datepicker( $.datepicker.regional[ "zh-CN" ] );
+         $("#date_start_input").datepicker({showOn: "focus",constrainInput:"true",minDate:"-3m"});
+         $("#date_end_input").datepicker({showOn: "focus",constrainInput:"true"});
+         $("#date_end_input").datepicker('setDate', new Date());
+         $( "#accordion" ).accordion({icons:{header: "ui-icon-circle-plus",headerSelected: "ui-icon-circle-minus"}});
+         $("#staff_input").autocomplete('/staff/list/', {
+             minChars: 0,
+             max:100,
+             width: 300,
+             autoFill: false,
+             mustMatch:true
+        });
+         $("#staff_input").result(function(event, data, formatted) {
+            if (data){
+                $("#staff_id_input").val(data[1]);}
+        });
+         $("#customer_input").autocomplete('/csearch/', {
+            minChars: 0,
+            max:100,
+            width: 300,
+            autoFill: false,
+            mustMatch: true,
+            formatItem: formatItem
+        });
+        function formatItem(row) {
+             return row[0] + "\t卡号:" + row[1] + "\t电话:" + row[2];
+        }
+
+        $("#customer_input").result(function(event, data, formatted) {
+            if (data){
+                $("#customer_id_input").val(data[3]);}
+        });
+
+        $(".order_detail_div .m_btn").live("click",function(){
+            console.log($(this).closest(".order_detail_div"))
+        });
+
+
+
+        $("#order_search [href='javascript:void(0)']").click(function(event) {
+            if ($(this).attr("id")=="simple10") {postSearch(true,"simple",10)}
+            else if ($(this).attr("id")=="simple100") {postSearch(true,"simple",100)}
+            else  {postSearch(true,"simple",1)}
+        });
+
+        $("#result_div [href='javascript:void(0)']").live('click', function(event) {
+            console.log($(this).parent());
+            $(this).parent().toggleClass("opened");
+            //$("#result_div .order_detail_div:visible").slideToggle();
+            var oid =$(this).parent().next().attr("id");
+            $("#"+oid).slideToggle();
+            $("#"+oid).html().length>0 ||
+            $.ajax({
+                type: "GET",
+                url: "/sales/edit/?q="+oid,
+                dataType: "json",
+                timeout:10000,
+                beforeSend: function () {$("#"+oid).parent().toggleClass("ac_loading")},
+                complete:function(){$("#"+oid).parent().toggleClass("ac_loading")},
+                success:function(msg){
+                    var oStr="";
+                    $("#"+oid).html("");
+                    $(msg.data).each(function(){
+                        oStr=oStr+"<tr><td width='200px'>"+this.pname+"</td>\n<td>"+this.psize+"</td>\n<td>"+this.price+"</td>\n"+
+                                "<td>"+this.quantity+"</td>\n"+
+                                "<td>"+this.price*this.quantity+"</td></tr>\n";
+                    });
+                    $("#"+oid).append("<table class='table_order_detail'><tr><td><table class='table_contain'><thead><tr>\n"+
+                                "<td>名称</td><td >规格</td><td>价格</td><td>数量</td><td>小计</td>\n"+
+                                "</tr></thead>\n"+oStr+"\n</table></td><tr></table>\n");
+                    $("#"+oid).append("<table style='width:100%;text-align:center;'><tr>\n"+
+                                "<td >备注: "+msg.note+"</td>\n"+
+                                "<td >折扣: "+msg.discount+"</td>\n"+
+                                "<td style='width:20%'><button type='button' class='m_btn' ><span><img src='/static/images/css/ok_small.png' class=' png'></span> 开始修改</button></td></tr></table>\n");
+                },
+                error:function(msg){
+                    console.log(msg);
+                }
+
+            });
+        });
+
+
+
+    function postSearch(reload,type,count){
+            var postData;
+            type == "simple" ? postData="{'type':'simple','page':'"+thePage+"','count':'"+count+"'}" :
+            postData = "{'type':'"+type+"','page':'"+thePage+"','code':'"+ $("#code_input").val() +"','staff':'"+$("#staff_id_input").val()+"','customer':'"+ $("#customer_id_input").val()+"','sDate':'"+$("#date_start_input").val()+
+                                "','eDate':'"+$("#date_end_input").val()+"','note':'"+$("#note_input").val()+"','hidden':'"+$("#hidden_input").is(":checked")+"'}";
+            //console.log(postData);
+                        $.ajax({type: "POST",
+                            url: "/sales/search/",
+                            contentType:"text/plain",
+                            dataType: "json",
+                            data:postData,
+                            timeout:10000,
+                            beforeSend: function () {
+                                $("#order_search_btn").attr("disabled",true);
+                                $.blockUI({ message: '<h3><img src="/static/images/css/loading.gif" /></h3>'});
+                                //$.blockUI({ message: '<h3><img src="/static/images/css/load.gif" /> 结果获取中（提醒：系统只回溯3个月内的订单）...</h3>'});
+                            },
+                            success:function(msg){
+                                if (msg.flag){
+                                    //console.log(msg.data)
+                                    var pageRows =20; //页面容量
+                                    var pageCount = Math.ceil(msg.rows/pageRows)
+                                    $("#result_div").children().detach();
+                                    $("#result_div").append("<div style='margin: 0 auto;text-align:center;'><h1>共 "+msg.rows+" 条 / "+pageCount+" 页匹配销售记录</h1></div>");
+                                    $(msg.data).each(function(){
+                                    $("#result_div").append("<div style='background-color:#f2f2f2;border-top: 1px dashed #ddd;'><div class='order_div' ><a href='javascript:void(0)' class='blue' title='点击展开'> "
+                                                     +this.code+" 金额："+this.total+"</a> 销售人员：<a href='/staff/?q="+this.staff_id+"' class='blue'>"+this.staff+"</a> 顾客：<a href='/customer/?q="+this.customer_id+"' class='blue'>"
+                                                     +this.customer+"</a> [日期："+this.date+"] </div><div class='order_detail_div' id='"+this.id+"'></div><div>")
+                                    });
+
+                                    //if(reload){}
+                                    PageClick = function(pageclickednumber) {
+                                    $("#pager_div").pager({ pagenumber: pageclickednumber, pagecount: pageCount, buttonClickCallback: PageClick });
+                                    thePage = pageclickednumber;
+
+                                    postSearch(false,"normal",0);
+
+
+                                    //$("#result").html("Clicked Page " + pageclickednumber);
+                                };
+                                $("#pager_div").pager({ pagenumber: thePage, pagecount: pageCount, buttonClickCallback: PageClick });
+                                $("#pager_div").show();
+
+                                }
+                                else{
+                                    $(msg.data).each(function(){
+                                         showErr(this);
+                                    });
+                                    $("#result_div").children().detach();
+                                    $("#pager_div").hide();
+
+                                }
+
+                                $.unblockUI();
+
+
+                                //$("#result_div").unblock();
+                                $("#order_search_btn").attr("disabled",false);
+                            },
+                                error:function(){
+                                    $("#order_search_btn").attr("disabled",false);
+                                    $.unblockUI();
+                                    //$("#result_div").unblock();
+                                    showErr("查询请求处理超时，重试无效后请联系管理人员");
+                                }
+                        })
+                    }
+        $("#order_search_btn").click(function(){
+            /^[A-Za-z0-9]{0,20}$/.test($("#code_input").val()) || showErr("订单编号由4-20位数字及字母组成",true);
+            var regDate = /(([0-9]{3}[1-9]|[0-9]{2}[1-9][0-9]{1}|[0-9]{1}[1-9][0-9]{2}|[1-9][0-9]{3})-(((0[13578]|1[02])-(0[1-9]|[12][0-9]|3[01]))|((0[469]|11)-(0[1-9]|[12][0-9]|30))|(02-(0[1-9]|[1][0-9]|2[0-8]))))|((([0-9]{2})(0[48]|[2468][048]|[13579][26])|((0[48]|[2468][048]|[3579][26])00))-02-29)/;
+            ($("#date_start_input").val().length<1 || regDate.test($("#date_start_input").val()))  || showErr("日期请按照 2011-01-30 的格式填写",true);
+            ($("#date_end_input").val().length<1 || regDate.test($("#date_end_input").val()))  || showErr("日期请按照 2011-01-30 的格式填写",true);
+            ($("#date_start_input").val().length>0 ? new Date($("#date_start_input").val()) : 0) <= ( $("#date_end_input").val().length>0 ? new Date($("#date_end_input").val()) : 0) || showErr("起始时间不能够大于结束时间",true);
+            //如果初始日期字符长度大于零，则验证合法性，否则返回为零值，用于和结束日期的比较
+            if ($("#customer_input").val().length<1){$("#customer_id_input").val("")}
+            if ($("#staff_input").val().length<1){$("#staff_id_input").val("")}
+            if ($("#date_start_input").val().length>0){
+                var sDate = new Date($("#date_start_input").val());
+                if ((new Date()-sDate)/(1000*24*3600) > 93) {
+                    showErr("为避免数据量过大，系统只回溯3个月内的订单",true);
+                }
+            }
+            //(($("#money_less_input").val().length<1 || (/^[0-9]+(.[0-9]{2}|.[0-9]{1})?$/.test($("#money_less_input").val()))) && ($("#money_more_input").val().length<1 || /^[0-9]+(.[0-9]{2}|.[0-9]{1})?$/.test($("#money_more_input").val()))) || showErr("价格应为整数或最多两位小数的数字",true);
+            if (!flag){
+                postSearch(true,"normal",0);
+            }
+        })
+         
+     })
+    </script>
+{% endblock %}
+{% block nav %}
+	<li><a href="/">Home</a></li>
+        <li class="act">销售管理</li>
+        <li><a href="/depots/">库存管理</a></li>
+        <li><a href="/staff/">个人资料</a></li>
+        <li><a href="/customer/">会员管理</a></li>
+{% endblock %}
+{% block head-foot%}
+    <div id="head-foo">
+    <div id="head-foot">
+        <ul>
+            <li><a href ="/sales/">新增订单</a></li>
+            <li><a href ="/sales/edit/">订单查询 ／ 修改</a></li>
+            <li><a href ="/sales/chart/">销售统计</a></li>
+        </ul>
+    </div>
+    </div>
+{% endblock %}
+{% block contents %}
+
+    <div id="order_search" class="add_cart">
+        <p><label for="code_input">订单编号: </label>
+        <input type="text" id="code_input" class="ac_input" style="width:300px" />
+        <label>日期区间: </label>
+        <input type="text" id="date_start_input" class="ac_input" style="width: 120px" title="为避免数据量过大，系统只回溯3个月内的订单" />-
+        <input type="text" id="date_end_input"  class="ac_input" style="width: 120px" />
+        快速导航：<a href="javascript:void(0)" id="simple1" title="前1条订单" class="blue">前1条</a> <a href="javascript:void(0)" id="simple10" title="前10条订单" class="blue">前10条</a> <a href="javascript:void(0)" id="simple100" title="前30条订单" class="blue">前100条</a></p>
+        <p><label for="staff_input">销售人员: </label>
+        <input type="text" id="staff_input" class="ac_input ac_init png"  style="width: 121px" />
+        <input type="text" id="staff_id_input" style="display: none"/>
+        <label for="customer_input">顾客: </label>
+        <input type="text" id="customer_input" class="ac_input ac_init png" style="width:121px"/>
+        <input type="text" id="customer_id_input" style="display: none"/>
+        <!--更换为note
+        <label>金额区间: </label>
+        <input type="text" id="money_less_input" class="ac_input" style="width: 120px" />-
+        <input type="text" id="money_more_input"  class="ac_input" style="width: 120px" />
+         -->
+        <label for="note_input">订单备注: </label>
+        <input type="text" id="note_input" class="ac_input" style="width:266px" />
+        <label for="hidden_input">已删</label>
+        <input type="checkbox" id="hidden_input"  class="ac_input"  style="cursor: default"/>
+        <button type="submit" id="order_search_btn" class="m_btn"><img src="/static/images/css/search_small.png" class=" png"> 订单模糊检索 </button></p>
+    </div>
+<div id="result_div" style="border: 8px solid #F67F3A;"></div>
+<div id="pager_div" ></div>
+{% endblock %}

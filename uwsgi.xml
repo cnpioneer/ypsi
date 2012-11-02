@@ -1,0 +1,11 @@
+<uwsgi>
+    <workers>1</workers>
+    <processes>4</processes>
+    <enable-threads>true</enable-threads>
+    <pythonpath>/var/www/</pythonpath>
+    <pythonpath>/var/www/ypsi/</pythonpath>
+    <socket>/tmp/uwsgi_ypsi.sock</socket>
+    <app mountpoint="/">
+        <script>django_wsgi</script>
+    </app>
+</uwsgi>

@@ -1,0 +1,197 @@
+{% extends "simple.html" %}
+{% block js-css %}
+    <script type="text/javascript" src="/static/js/jquery-1.6.4.min.js"></script>
+    <script type="text/javascript" src="/static/js/highcharts.js"></script>
+    <script type="text/javascript" src="/static/js/jquery.autocomplete.min.js"></script>
+    <script type="text/javascript" src="/static/js/jquery.blockUI.js"></script>
+   	<script type="text/javascript">
+       function un_block(){$.unblockUI();}
+       function reLoad(){window.location.reload();}
+    $().ready(function() {
+        $(".ac_input").focus(function() {$(this).addClass("focus");})
+                      .blur(function() {$(this).removeClass("focus");});
+        function formatItem(row) {
+            var barcode;
+            row[1]==("None"||"") ? barcode="未录入" : barcode=row[1];
+                return row[0] + "\t条码:"+barcode ; //此处可定制提示信息
+        }
+        $("#name_input").result(function(event, data, formatted) {
+            if (data){
+                $("#id_input").val(data[2]);
+                $("#search_btn").attr("disabled",false);
+            }
+        });
+        $("#show_btn").click(function(){
+            $("#product_frame").attr({src:"/product/mini/"+window.location.search});
+           $.blockUI({
+                message: $("#frame_pa"),
+                css: {
+                    width: '600px',
+                    height: '500px',
+                    left: ($(window).width() - 600) / 2 + 'px',
+                    top: '15%'
+                }
+            });
+
+            $(".blockOverlay").attr("title","点击返回页面").click($.unblockUI);
+        });
+        $("#name_input").autocomplete("/pac/?type=simple", {
+            minChars: 2,
+            max:100,
+            width: 300,
+            cacheLength: 1,
+            mustMatch:true,
+            formatItem: formatItem,
+            formatResult: function(row){return row[0]} //格式化结果输出
+        });
+        var chartOptions ={
+           chart: {
+               renderTo: "",
+               borderWidth: 0,
+               borderColor:'#ddd',
+               plotBorderWidth: null
+          },
+          title: {
+             text: '',
+             style: {
+             color: '#555',
+             font: "20px simhei,Verdana, sans-serif"
+          }
+          },
+          tooltip: {
+             formatter: function() {
+                 return '<b>'+ this.point.name +'</b>: '+ this.percentage +' %  库存商品'+this.point.y +' 件';
+             }
+          },
+            xAxis: {
+         categories: []},
+          plotOptions: {
+              pie: {
+                  allowPointSelect: true,
+                  cursor: 'pointer',
+                  dataLabels: {
+                      enabled: true,
+                      color: '#777',
+                      connectorColor: '#000',
+                      formatter: function() {return this.percentage +' %';}
+                   },
+                  showInLegend: true
+                      },
+              spline:{
+                  showInLegend: false
+              }
+                        },
+           series: [{
+             type: "",
+             name: "depots show",
+             data: []
+          }]
+       };
+
+        function showChart(name,div,type,chartype){
+           $("#show_btn").attr("name")==undefined ||
+           $.ajax({
+           type: "GET",
+           url: "/depots/charts/?type="+type+"&id="+$("#show_btn").attr("name"),
+           dataType: "json",
+           timeout:10000,
+           success:function(msg){
+               if (msg.ttq>0){
+
+                   chartOptions.series[0].data=msg.data;
+                   chartOptions.series[0].type=chartype;
+                   chartOptions.chart.renderTo=div;
+                   chartOptions.title.text=name;
+                   if (chartype=="spline"){
+                       chartOptions.tooltip.formatter=(function(){return '<b>'+ this.point.name +'</b>: 销售'+this.point.y +' 件';})
+                   }
+                   new Highcharts.Chart(chartOptions);
+                   if (type=="psp"){
+                       $("#ttq").html(+msg.ttq);
+                   }
+               }
+           else{$("#"+ div +"").html("<div style='color:#eee;line-height:340px;text-align:center;font-size:200px;font-family:simhei'>無</div>")}},
+           error:function(msg){$.blockUI({ message: '<h3>系统读取库存数据错误，请联系管理员解决</h3>',timeout:2000});}
+           });
+        }
+        $("#search_btn").attr("disabled",true);
+        showChart("仓库分布一览","c1","pdp","pie");
+        showChart("各店分布一览","c2","psp","pie");
+        showChart("历史销售一览","c3","pssp","spline");
+    });
+	</script>
+{% endblock %}
+{% block nav %}
+        <li><a href="/">Home</a></li>
+        <li><a href="/sales/">销售管理</a></li>
+        <li class="act">库存管理</li>
+        <li><a href="/staff/">个人资料</a></li>
+        <li><a href="/customer/">会员管理</a></li>
+{% endblock %}
+{% block head-foot%}
+    <div id="head-foo">
+    <div id="head-foot">
+        <ul>
+            <li><a href ="/depots/">概览</a></li>
+            <li><a href ="/depots/remit/">汇款</a></li>
+            <li><a href ="/depots/in/">入库</a></li>
+            <li><a href ="/depots/out/">出库</a></li>
+            <li><a href ="/category/" target="_blank">类别管理</a></li>
+            <li><a href ="/depots/product/">产品细目</a></li>
+        </ul>
+    </div>
+    </div>
+{% endblock %}
+{% block contents %}
+    <form id="fm" method="GET" action="/depots/product">
+        <div style="text-align: center;margin-top: 40px;*margin-top:20px;">
+                <label for="name_input">产品名称 / 条形码：</label>
+                <input type="text" id="name_input" class="ac_input png" style="width: 280px;"/>
+                <input type="text" id="id_input" name="id" style="display: none"/>
+                <button type="submit" id="search_btn" class="m_btn"><img src="/static/images/css/search_small.png" class=" png"> 产品细目获取 </button>
+                <span >[ 因产品数量较多，为效率考虑请至少输入两个关键字符 ]</span>
+        </div>
+    </form>
+    {% if pd %}
+    <div style="margin-top: 40px;border: 1px solid #cccccc;border-radius: 6px;">
+    <div style="border-bottom: 1px solid #ccc;padding: 4px 10px 4px 10px;background-color:#eeeeee;border-radius: 5px 5px 0 0;height: 1%;overflow:auto;">
+        <div style="float: left;">
+            所属分类： {{ pd.category.pid.name }} <span ><img src="/static/images/css/next_small.png"  class="png"></span>
+        {{ pd.category.name }}  <span ><img src="/static/images/css/next_small.png" class="png"></span> {{ pd.name }}
+        </div>
+    </div>
+    <div>
+        <table style="width: 100%;word-break:break-all;padding:0">
+            <tr>
+                <td rowspan="2" style="vertical-align: top;min-width: 220px" >
+                    <ul style="list-style:square;line-height: 2em;color: #333">
+                        <li>名称：{{ pd.name }}</li>
+                        <li>条码：{{ pd.barcode }}</li>
+                        <li>尺寸：{{ pd.size }}</li>
+                        {% if level < 5 %}<li>入库均价：{{ pd.p_str.0 }} 元</li>{% endif %}
+                        <li>累计销量：{{ tq }} 件</li>
+                        <li>累计入库：{{ pd.p_str.3 }} 件</li>
+                        <li>累计出库：{{ pd.p_str.4 }} 件</li>
+                        <li>仓库库存：{{ pd.p_str.1 }} 件</li>
+                        <li>各店库存：<span id="ttq"></span> 件</li>
+                        <li>当前状态：
+                            {% if pd.hidden%}已删除{% else %}正常{% endif %}
+                        </li>
+                        <li>产品备注：{{ pd.note }}</li>
+                    </ul>
+                    <button type="button" id="show_btn" name="{{ pd.id }}" class="m_btn" style="margin-left: 15%;{% if level > 4 %}display: none;{% endif %}"><span><img src="/static/images/css/edit_small.png" class="png"></span> 修改产品信息</button>
+                </td>
+                <td width="38%"><div id="c1" style="min-width:95%;width:100%; height:340px;"></div></td>
+                <td width="38%"><div id="c2" style="min-width:95%;width:100%; height:340px;"></div></td>
+            </tr>
+            <tr style="padding-top: 30px">
+                <td colspan="2"><div id="c3" style="width:100%; height:340px;"></div></td>
+            </tr>
+        </table>
+    </div>
+    </div>
+    {% endif %}
+        <div id="frame_pa" style="display: none;" >
+        <iframe id="product_frame" scrolling="no"  frameborder="0" width="100%" height="100%"></iframe>
+    </div>
+{% endblock %}

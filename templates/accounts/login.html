@@ -1,0 +1,69 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<head>
+    <meta http-equiv="Content-Type" content="text/html;charset=utf-8"/>
+    <script type="text/javascript" src="/static/js/jquery-1.6.4.min.js"></script>
+    <link rel="shortcut icon" href="/static/images/favicon.ico"/>
+    <link rel="stylesheet" type="text/css" href="/static/css/style.css">
+    <!--[if IE 6]>
+    <script type="text/javascript" src="/static/js/DD_belatedPNG_0.0.8a-min.js"></script>
+    <script type="text/javascript">
+    DD_belatedPNG.fix('.png');
+    </script>
+    <![endif]-->
+    <title>登录 | YPSI 进销存管理系统</title>
+    <script type="text/javascript">
+    $().ready(function() {
+        if (window.location.search=="?act=stop"){
+            $("#form_ul").children("li").remove();
+            $("#form_ul").after("<div style='padding:6px' align='center'> 请关闭浏览器后重新登录</div>")
+        }
+
+        if ($(".errorlist").length>0){
+            $("#pa_div").removeClass("w320");
+            $("#pa_div").addClass("w410");
+        }
+        else{
+            $("#pa_div").removeClass("w410");
+            $("#pa_div").addClass("w320");
+        }
+    });
+
+ 
+
+    </script>
+    <style type="text/css">
+        .w410{
+            width:410px;
+        }
+        .w320{
+            width: 320px;
+        }
+        li{
+            list-style: none;
+            height: 2.5em;}
+        input {
+            width: 160px;
+        }
+    </style>
+</head>
+
+<html>
+<body>
+        <div id="pa_div" style="background:#dddddd;padding: 6px;margin:10% auto ;position: relative;*top:80%">
+
+            <div style="margin:0 0 6px 6px;">
+                <img src="/static/images/css/lock_small.png" class=" png"/> {{ page_title }}
+            </div>
+            <div style="background:#fafafa;padding:6px;*padding-top:20px;height:1%">
+            <form action="?act=check" method="POST">
+                <ul id="form_ul">
+               {{ form.as_ul }}
+                <li><button id="new_btn" style="height: 30px;font-size: 14px;width: 80px;margin-left: 125px;position: relative;" type="submit"><img src="/static/images/css/key_small.png" class=" png"> 登录</button></li>
+            </ul>
+            </form>
+            </div>
+
+        </div>
+
+</body>
+</html>

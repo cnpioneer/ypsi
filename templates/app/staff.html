@@ -1,0 +1,118 @@
+﻿{% extends "simple.html" %}
+{% block js-css %}
+    <script type="text/javascript" src="/static/js/jquery-1.6.4.min.js"></script>
+    <script type="text/javascript" src="/static/js/jquery.blockUI.js"></script>
+    <style type="text/css">
+        #form li{
+            margin-left: 10px;
+            line-height: 2.5em;
+            list-style: none;
+            *height: 35px;
+            *list-style-type: none;
+        }
+        #form label {display:inline-block;width: 100px;}
+        #s1 {margin-left: 155px;}
+    </style>
+    <script type="text/javascript">
+    $().ready(function() {
+        if (window.location.search == "?act=pwd" ){
+            $("#id_sid").val($("#form").attr("name"));
+            $("#id_sid").closest("li").hide();
+        }
+        if (window.location.search == "?act=pwd_changed" ){
+            $.blockUI({ message: '<h3>密码修改成功</h3>',timeout:1000});
+        }
+        var eStr = $("#err").text();
+        if (eStr){
+            var obj = $("#"+eStr.split(",")[0]);
+            var msg = eStr.split(",")[1];
+            (obj).parent().children("ul").remove();
+            (obj).prev().before("<ul class='errorlist'><li>"+msg+"</li></ul>");
+
+        }
+
+    });
+    </script>
+{% endblock %}
+{% block nav %}
+	<li><a href="/">Home</a></li>
+        <li><a href="/sales/">销售管理</a></li>
+        <li><a href="/depots/">库存管理</a></li>
+        <li class="act">个人资料</li>
+        <li><a href="/customer/">会员管理</a></li>
+{% endblock %}
+{% block head-foot%}
+    <div id="head-foo">
+    <div id="head-foot">
+        <ul>
+            <li><a href ="/staff/">概览</a></li>
+            <li><a href ="/staff/?act=payList">薪资记录</a></li>
+            <li><a href ="/staff/?act=pwd">修改密码</a></li>
+        </ul>
+    </div>
+    </div>
+{% endblock %}
+{% block contents %}
+    <div id="err" style="display: none">{{ errmsg }}</div>
+    {% if form %}
+
+        <div style="border: 1px solid #cccccc;border-radius: 6px;width: 100%">
+            <div style="border-bottom: 1px solid #ccc;padding: 4px 10px 4px 10px;background-color:#e4e4e4;border-radius: 5px 5px 0 0;">{{ page_title }}</div>
+            <div>
+                <form method="post" action="?act=pwd">
+                    <ul id="form" name="{{ sid }}" >
+                        {{ form.as_ul }}
+                    </ul>
+                    <p>
+                        <button type="submit" class="m_btn" id="s1"><span><img src="/static/images/css/ok_small.png" class="png"></span> 提交记录</button>
+                    </p>
+                </form>
+            </div>
+        </div>
+    {% else %}
+    <div id="p-left" >
+        <div style="border: 1px solid #cccccc;border-radius: 6px;">
+            <div style="border-bottom: 1px solid #ccc;padding: 4px 10px 4px 10px;background-color:#e4e4e4;border-radius: 5px 5px 0 0;"><img src="/static/images/css/user_small.png" class=" png"/> 员工详细信息</div>
+            <div >
+            <table>
+                <tr>
+                    <td style="vertical-align: top;padding: 10px">
+                        {% if staff.image %}
+                        <img src="/static/uploads/{{ staff.image }}" style="border: 1px solid #ccc;padding: 6px; width: 128px;height: 128px;"/>
+                        {% endif %}
+                    </td >
+                    <td style="vertical-align: top;padding: 10px">
+                        <ul style="list-style : none outside;line-height: 1.85em;font-size: 14px;margin: 0;padding: 0;">
+                        <li>姓名：{{ staff.name }}</li>
+                        <li>性别：{{ staff.get_sex_display }}</li>
+                        <li>部门：{{ staff.shop }}</li>
+                        <li>职务：{{ staff.get_level_display }}</li>
+                        <li>入职：{{ staff.joindate|date:"Y-m-d" }}</li>
+                        <li>手机：{{ staff.cellphone }}</li>
+                        <li>固话：{{ staff.homephone }}</li>
+                        </ul>
+                    </td>
+                </tr>
+            </table>
+            </div>
+        </div>
+    </div>
+        <div style="float:right;width:235px;">
+        <div style="background:#e4e4e4;padding: 6px">
+
+                 <span><img src="/static/images/css/dot16.png" class=" png"/> 人员列表</span>
+            
+            <div style="background : #fafafa;padding: 6px">
+               {% regroup staff_list by shop as grouped %}
+                    {% for group in grouped %}
+                        <span><img src="/static/images/css/add_small2.png" alt="" class="png"> {{ group.grouper }}</span>
+                        <ul style="list-style : square outside;margin: 4px 0;*margin: 4px 0 4px 20px">
+                            {% for item in group.list %}<li><a href="?id={{ item.id }}" title="紧急联系：{{ item.homephone }}" class="blue">{{ item.name }} {{ item.cellphone }}</a></li>{% endfor %}
+                        </ul>
+                    {% endfor %}
+            </div>
+
+        </div>
+        </div>
+{% endif %}
+{% endblock %}

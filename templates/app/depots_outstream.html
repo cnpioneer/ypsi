@@ -1,0 +1,558 @@
+{% extends "simple.html" %}
+{% block js-css %}
+    <script type="text/javascript" src="/static/js/jquery-1.6.4.min.js"></script>
+    <script type="text/javascript" src="/static/js/jquery.autocomplete.min.js"></script>
+    <script type="text/javascript" src="/static/js/jquery-ui-1.8.16.custom.min.js"></script>
+    <script type="text/javascript" src="/static/js/jquery.blockUI.js"></script>
+    <script type="text/javascript" src="/static/js/jquery.csrf.js"></script>
+    <script type="text/javascript" src="/static/js/jquery.jgrowl.min.js"></script>
+    <link rel="stylesheet" type="text/css" href="/static/css/jquery.jgrowl.css">
+    <link rel="stylesheet" type="text/css" href="/static/css/jquery-ui-1.8.16.custom.css">
+    <style type="text/css">
+        #form li{
+            margin-left: 10px;
+            line-height: 2.5em;
+            list-style-type: square;
+            *height: 35px;
+            *list-style-type: none;
+        }
+        #form label {display:inline-block;width: 100px;}
+        .elist{
+            color:red;
+            float: right;
+            margin-right: 30%;
+        }
+        #s1 {margin-left: 155px;}
+    </style>
+
+   	<script type="text/javascript">
+
+    $().ready(function() {
+        /*
+        if (window.location.search.indexOf("act=detail")>-1){
+            $.get("/dac/",function(data){
+                var tData =data.split("\n");
+                var i;
+                for (i=0;i<(tData.length-1);i++){
+                    $("#depot_list").append("<option value="+ tData[i].split("|")[3]+">"+tData[i].split("|")[0] +"</option>")
+                    $("#depot_qlist").append("<option value="+ tData[i].split("|")[3]+">"+tData[i].split("|")[1] +"</option>")
+                }
+            });
+        }*/
+
+        if (window.location.search.indexOf("act=edit")>-1){
+            $("#id_instream").parent().hide();
+        }
+        //按钮点击动作配套fun
+        function rm(){
+                    var that = $(".focus",$("#ind_list"))[0];
+                    var dList = $("td:eq(4) select",$(that));
+                    $("td:eq(3)",$(that)).html($("td:eq(3)",$(that)).text());
+                    $("td:eq(4)",$(that)).html(dList.find("option:selected").text());
+                    $("td:eq(7)",$(that)).html("<a href='javascript:void(0)' class='blue'>删</a>");
+                    $(that).removeClass("focus");
+                }
+        parseInt($("#level").text())>=5 ||
+        $("#ind_list tbody tr").live("click",function(){
+            if (!$(this).hasClass("focus")){
+                rm();
+                $("td:eq(3)",$(this)).html("<div contenteditable='true' class='editable'>"+ $("td:eq(3)",$(this)).text() +"</div>");
+                if (!$("td:eq(5)",$(this)).text()){
+                    var r_str="";
+                    var did = $("td:eq(6)",$(this)).text();
+                    var oq = parseInt($("td:eq(9)",$(this)).text());
+                    $.get("/dac/?pid="+$("td:eq(1)",$(this)).text(),function(data){
+                        var tData =data.split("\n");
+                        var i;
+                        //$("#depot_list").html("");
+                        for (i=0;i<(tData.length-1);i++){
+                            //$("#depot_list").append("<option value="+ tData[i].split("|")[3]+">"+tData[i].split("|")[0] +" "+tData[i].split("|")[1] + "</option>")
+                            if (i+1 ==  did){
+                                r_str += ("<option value="+ tData[i].split("|")[3]+" selected>"+tData[i].split("|")[0] +" "+tData[i].split("|")[1]+ "</option>\n");
+                            }
+                            else{r_str += ("<option value="+ tData[i].split("|")[3]+">"+tData[i].split("|")[0] +" "+tData[i].split("|")[1] + "</option>\n");}
+
+
+                        }
+                    $("td:eq(4)",$(".focus",$("#ind_list"))[0]).html("<select>"+r_str+"</select>");
+                    $("td:eq(5)",$(".focus",$("#ind_list"))[0]).html("<select>"+r_str+"</select>");
+                    });
+
+                }
+                else{
+                    $("td:eq(4)",$(this)).html($("td:eq(5) select",$(this)).clone());
+
+                }
+               $("td:eq(7)",$(this)).append("/ <a href='javascript:void(1)' class='blue'>提交</a>");
+                $(this).addClass("focus");
+               }
+        });
+        $("[href='javascript:void(0)']").live("click",function(){
+            $.blockUI({ message: $("#confirm"),css: {top: '20%'}});
+            $('#yes').click(function() {
+                var that = $(".focus",$("#ind_list"))[0];
+                if ($("td:eq(8)",$(that)).text()){
+                    $.ajax({
+                        type: "POST",
+                        url: "?act=d_del",
+                        contentType:"text/plain",
+                        dataType: "text",
+                        data:"id="+$("td:eq(8)",$(that)).text(),
+                        timeout:10000,
+                        beforeSend: function () {
+                            $.blockUI({ message: '<h3><img src="/static/images/css/load.gif" /> 操作提交中...</h3>'});},
+                        success:function(msg) {
+                            if (msg=="done"){
+                                $(that).detach();
+                                $.blockUI({ message:'<h3>操作完成</h3>',timeout:1500});
+                            }
+                            else{ $.blockUI({ message:'<h3>操作失败,请复核数据后再次提交</h3>',timeout:1500});}
+
+                        },
+                        error:function(){$.blockUI({ message: '<h3>操作失败,请复核数据后再次提交</h3>',timeout:1500});}
+
+                });}
+                else{
+                    $(that).detach();
+                    $.unblockUI();}
+
+            });
+            $('#no').click(function() {
+                $.unblockUI();
+                return false;});
+
+        });
+
+        function iff(){$.blockUI({ message: '<h3>操作失败,请复核数据后再次提交</h3>',timeout:2000});}
+        function itp(){$.blockUI({ message: '<h3><img src="/static/images/css/load.gif" /> 操作提交中...</h3>'});}
+
+        $("[href='javascript:void(1)']").live("click",function(){
+
+            $.blockUI({ message: $("#confirm"),css: {top: '20%'}});
+            $('#yes').click(function() {
+                var that = $(".focus",$("#ind_list"))[0];
+                var dList = $("td:eq(4) select",$(that));
+                var tq = parseInt(dList.find("option:selected").text().split(" ")[1]);
+                var oq = parseInt($("td:eq(9)",$(that)).text());
+                var nq = parseInt($("td:eq(3)",$(that)).text());
+                var ttq = tq;
+                if (dList.val()==$("td:eq(6)",$(that)).text()){
+                    ttq = tq+oq;
+                }
+
+                if (nq>ttq){
+                    $.unblockUI();
+                    showErr("出库数不可大于当前仓库库存数")
+                }
+                else if ($("td:eq(8)",$(that)).text()){
+                    $.ajax({
+                        type: "POST",
+                        url: "?act=d_edit",
+                        contentType:"text/plain",
+                        dataType: "json",
+                        data:"id="+$("td:eq(8)",$(that)).text()+"&quantity="+ nq + "&pid="+$("td:eq(1)",$(that)).text()+
+                                "&depot="+dList.val(),
+                        timeout:10000,
+                        beforeSend: itp,
+                        success:function (data){
+                            if (data.flag){$.unblockUI();
+
+                                var r_str="";
+                                var did = dList.val();
+                                $.get("/dac/?pid="+$("td:eq(1)",$(that)).text(),function(data){
+                                    var tData =data.split("\n");
+                                    var i;
+                                    //$("#depot_list").html("");
+                                    for (i=0;i<(tData.length-1);i++){
+                                        //$("#depot_list").append("<option value="+ tData[i].split("|")[3]+">"+tData[i].split("|")[0] +" "+tData[i].split("|")[1] + "</option>")
+                                        if ((i+1) ==  did){
+                                            r_str += ("<option value="+ tData[i].split("|")[3]+" selected>"+tData[i].split("|")[0] +" "+tData[i].split("|")[1]+ "</option>\n");
+                                        }
+                                        else{r_str += ("<option value="+ tData[i].split("|")[3]+">"+tData[i].split("|")[0] +" "+tData[i].split("|")[1] + "</option>\n");}
+
+                                    }
+                                    $("td:eq(3)",$(that)).html($("td:eq(3)",$(that)).text());
+                                    //$("td:eq(4)",$(that)).html(dList.find("option:selected").text());
+                                    $("td:eq(7)",$(that)).html("<a href='javascript:void(0)' class='blue'>删</a>");
+                                    $(that).removeClass("focus");
+                                    $("td:eq(5)",$(that)).html("<select>"+r_str+"</select>");
+
+                                    $("td:eq(4)",$(that)).html($("td:eq(5) select",$(that)).find("option:selected").text());
+                                    $("td:eq(6)",$(that)).html(did);
+                                    $("td:eq(9)",$(that)).html(nq);
+                            });}
+                            else{$.blockUI({ message:'<h3>'+data.msg+'</h3>',timeout:1000});}},
+                        error:iff
+
+                });}
+                else{showErr("参数不足");}
+
+            });
+            $('#no').click(function() {
+                $.unblockUI();
+                return false;});
+        });
+
+        $("[href='javascript:void(2)']").live("click",function(){
+            $.blockUI({ message: $("#confirm"),css: {top: '20%'}});
+            var id = this.name;
+            var papa = $(this).parent();
+            var me = $(this);
+
+            $('#yes').click(function() {
+                $.ajax({
+                    type: "POST",
+                    url: "?act=del",
+                    contentType:"text/plain",
+                    dataType: "text",
+                    data:"id="+id,
+                    timeout:10000,
+                    beforeSend: itp,
+                    success:function (data){
+                        if (data=="success"){$.unblockUI();$(papa.prev()).html("已删除");me.detach();}
+                        else{$.blockUI({ message:'<h3>操作错误，请返回重试</h3>',timeout:1000});}},
+                    error:iff
+                });
+            });
+            $('#no').click(function() {
+                $.unblockUI();
+                return false;});
+        });
+
+        function showErr(str){
+            $.jGrowl(str,{header:"错误提示",timeout:5000});}
+
+        function check_pname(obj){
+            var flag;
+            if ($("#ind_list tbody tr").length>0){
+            $("#ind_list tbody tr").each(function(){
+                if ($("td:eq(0)",this).text()==$("#name_input").val().replace(/(^\s*)|(\s*$)/g, "") && $("td:eq(6)",this).text()==$("#did_input").val()){
+                    showErr("当前出库单中已包含同一仓库同一产品出库记录");
+                    flag=false;
+                    return flag;
+                     }
+                else {flag=true;
+                }
+            });}
+            else{flag=true;}
+            return flag;
+        }
+        function check_price(obj){
+            if (!/^[0-9]+(.[0-9]{2}|.[0-9]{1})?$/.test(obj)){
+                showErr("进价应为整数或最多两位小数的数字");
+                return false;
+            }
+            else{return true;}
+        }
+        function check_quantity(obj){
+            if (!/^[1-9][0-9]*$/.test(obj)){
+                showErr("请正确输入数量");
+                return false;
+            }
+            else{return true;}
+        }
+
+        
+        if (window.location.search == "?act=add"){
+            $("#id_hidden").closest("li").hide();
+        }
+        else if (window.location.search == "?act=added"){
+            $.blockUI({"message":"<h3>记录添加成功 1秒钟后自动跳转</h3>",timeout:1500});
+            setTimeout(location.href ="?act=list",1500);
+        }
+
+        $("#id_date").datepicker({showOn: "both",constrainInput:"true"});
+        if (window.location.search == "?act=add"){$("#id_date").datepicker('setDate', new Date().toLocaleTimeString());}
+        $("#in_list tbody tr").live("mouseover",function(){
+           $(this).addClass("focus");
+        });
+        $("#in_list tbody tr").live("mouseout",function(){
+            $(this).removeClass("focus");
+        });
+        $(".ac_input").focus(function() {
+            $(this).addClass("focus");
+        }).blur(function() {
+            $(this).removeClass("focus");
+        });
+        function formatItem(row) {
+            return row[0] + "\t条码:" + row[1] + "\t库存:" + row[2];
+        }
+
+        function formatResult(row) {
+            return row[0];
+        }
+
+        $("#name_input").autocomplete('/pac/?type=mini', {
+            minChars: 2,
+            max:500,
+            width: 350,
+            mustMatch: true,
+            formatItem: formatItem,
+            formatResult: formatResult
+        });
+        
+         $("#name_input").result(function(event, data, formatted) {
+            if (data){
+                $("#bar_input").val(data[1]);
+                $("#value_input").val(data[4]);
+                $("#id_input").val(data[3]);
+            }
+         });
+         $("#name_input").blur(function(){
+             if ($("#name_input").val().length>0){
+             $("#depot_input").attr("disabled",false);
+             $("#depot_input").addClass("ac_init png");
+             $("#depot_input").autocomplete('/dac/?pid='+$("#id_input").val(), {
+                    minChars: 0,
+                    max:100,
+                    width: 287,
+                    mustMatch: true,
+                    formatItem: function(row){
+                         return row[0] + "\t此产品数量:" + row[1] + "\t总量:" + row[2];
+                                    },
+                    formatResult: formatResult
+                });
+             }
+         });
+
+         $("#depot_input").result(function(event, data, formatted) {
+            if (data){
+                $("#hquantity_input").val(data[1]);
+                $("#did_input").val(data[3]);
+            }
+         });
+
+
+
+        $("#add_btn").click(function(){
+            if (check_pname($("#name_input").val()) && check_quantity($("#quantity_input").val()) ){
+                if (!($("#name_input").val() && $("#depot_input").val())){
+                    showErr("除位置备注外其余均为必填项");
+                }
+                else if (parseInt($("#quantity_input").val())>parseInt($("#hquantity_input").val())){
+                    showErr("出库数不可大于当前仓库库存数");
+                }
+                else{
+                    $.ajax({
+                        type: "POST",
+                        url: "/depots/out/?act=d_add",
+                        contentType:"text/plain",
+                        dataType: "json",
+                        data:"outid="+$("#outId").val()+"&pid="+$("#id_input").val()+"&quantity="+$("#quantity_input").val()+"&depot="+$("#did_input").val(),
+                        timeout:10000,
+                        beforeSend: itp,
+                        success:function (data){
+                            if (data.flag){
+                                $.unblockUI();
+                                var d_str="<tr>\n<<td><a href='/depots/product/?id="+$("#id_input").val()+"' class='blue' >" + $("#name_input").val() +"</td>\n"+
+                                "<td style='display:none;'>"+ $("#id_input").val() +"</td>\n"+
+                                "<td>"+ $("#bar_input").val() +"</td>\n"+
+                                "<td>"+ $("#quantity_input").val() +"</td>\n"+
+                                "<td>"+ $("#depot_input").val() +"</td>\n"+
+                                "<td style='display:none;'></td>\n"+
+                                "<td style='display:none;'>"+ $("#did_input").val() +"</td>\n"+
+                                "<td><a href='javascript:void(0)' class='blue'>删</a></td>\n"+
+                                "<td style='display:none;'>"+data.id+"</td>\n"+
+                                "<td style='display:none;'>"+ $("#quantity_input").val() +"</td>\n</tr>\n";
+                                $("#name_input").val("");
+                                $("#depot_input").val("");
+                                $("#did_input").val("");
+                                if ($("#ind_list tbody tr").length>0){
+                                    $("#ind_list tbody tr:first").before(d_str);
+                                }
+                                else{
+                                    $("#ind_list tbody").append(d_str);
+                                }
+
+                            }
+                            else{$.blockUI({ message:'<h3>'+data.msg+'</h3>',timeout:1000});}},
+                        error:iff
+                    });
+                }}
+        });
+
+    });
+	</script>
+{% endblock %}
+{% block nav %}
+        <li><a href="/">Home</a></li>
+        <li><a href="/sales/">销售管理</a></li>
+        <li class="act">库存管理</li>
+        <li><a href="/staff/">个人资料</a></li>
+        <li><a href="/customer/">会员管理</a></li>
+{% endblock %}
+{% block head-foot%}
+    <div id="head-foo">
+    <div id="head-foot">
+        <ul>
+            <li><a href ="/depots/">概览</a></li>
+            <li><a href ="/depots/remit/">汇款</a></li>
+            <li><a href ="/depots/in/">入库</a></li>
+            <li><a href ="/depots/out/">出库</a></li>
+            <li><a href ="/category/" target="_blank">类别管理</a></li>
+            <li><a href ="/depots/product/">产品细目</a></li>
+        </ul>
+    </div>
+    </div>
+{% endblock %}
+{% block contents %}
+
+    {% if outstream %}
+        <div style="padding: 15px 0 0 0">
+            <label for="name_input">产品：</label><input type="text" id="name_input" class="ac_input" maxlength="20" style="width:240px" title="请最少输入两个关键字符便于查找"/>
+            <input type="text" id="id_input" style="display: none"/>
+            <input type="text" id="bar_input" style="display: none"/>
+            <label for="quantity_input">数量：</label><input type="text" id="quantity_input" class="ac_input" maxlength="5" style="width:80px"/>
+            <input type="text" id="hquantity_input" style="display:none"/>
+            <label for="depot_input">仓库：</label><input type="text" id="depot_input" title="请先选定出库产品" disabled="true" class="ac_input" maxlength="3" style="width:150px"/>
+            <input type="text" id="did_input" style="display: none"/>
+            <button  id="add_btn" class="m_btn"><span><img src="/static/images/css/ok_small.png" class=" png"></span> 确定添加</button>
+        </div>
+
+    {% endif %}
+    <div style="margin-top: 30px;border: 1px solid #cccccc;border-radius: 6px;">
+        <div style="border-bottom: 1px solid #ccc;padding: 4px 10px ;background-color:#eeeeee;border-radius: 5px 5px 0 0;height: 1%;overflow:auto;">
+            <div style="float: left;">
+            {% if form %}
+                <img src="/static/images/css/add_small.png" class="png"> {{ page_title }}
+            </div>
+            <div style="float: right;">
+                <a href="?act=list" class="blue"><img src="/static/images/css/article_small.png" class="png"> 查看以往记录 </a>
+                <a href="?act=add" class="blue"><img src="/static/images/css/add_small2.png" class="png"> 新增出库提要</a>
+                <a href="javascript:history.go(-1)" class="blue"><img src="/static/images/css/back_16.png" class="png"> 返回</a>
+            </div>
+            </div>
+                {% ifequal act "add" %}
+                <form method="post" action="?act=add">
+                {% else %}
+                <form method="post" action="?act=edit&id={{ oId }}">
+                {% endifequal %}
+                <ul id="form">
+                    {{ form.as_ul }}
+                </ul>
+                <p>
+                    <button type="submit" class="m_btn" id="s1"><span><img src="/static/images/css/ok_small.png" class="png"></span> 提交记录</button>
+                </p>
+                </form>
+
+
+            {% else %}
+                {% if outstream %}
+                    {{ outstream.code }} 经办人：{{ outstream.keeper }}、{{ outstream.staff1 }} [{{ outstream.date|date:"Y-m-d" }}]
+                {% else %}
+                <img src="/static/images/css/left_small.png" class="png"> 出库提要列表
+                {% endif %}
+            </div>
+            <div style="float: right;">共{{ rows }}条记录 {{ out_list.number }}/{{ out_list.paginator.num_pages }}页
+                {% if outstream %}
+                    <p id="level" style="display: none;">{{ level }}</p>
+                    <input type="text" id="outId" value="{{ outstream.id }}" style="display: none"/>
+                    {% if level < 5 %}<a href="?act=edit&id={{ outstream.id }}" class="blue"><img src="/static/images/css/edit_small.png" class="png"> 提要修改</a>{% endif%}
+                    <a href="javascript:history.go(-1)" class="blue"><img src="/static/images/css/back_16.png" class="png"> 返回</a>
+                {% else %}
+                    {% if level < 5 %}<a href="?act=add" class="blue"><img src="/static/images/css/add_small2.png" class="png"> 新增出库提要</a>{% endif%}
+                {% endif %}
+
+            </div>
+        </div>
+        <div >
+        {% if outstream %}
+            <div><select id="depot_list" style="display: none;"></select><select id="depot_qlist" style="display: none;"></select></div>
+            <table class="table_contain" id="ind_list" style="background-color: #fff">
+                <thead>
+                <tr>
+                    <td>产品名称</td><td style="display:none;">pId</td><td>条形码</td><td>数量（个）</td><td>仓库</td><td style="display:none;">hDepot</td>
+                    <td style="display:none;">did</td><td>操作</td><td style="display:none;">id</td><td style="display:none;">hQuantity</td>
+                </tr>
+                </thead>
+                <tbody>
+                {% for i in out_list.object_list %}
+                    <tr>
+                    <td><a href="/depots/product/?id={{ i.product.id }}" class="blue" target="_blank">{{ i.product.name }}</a></td>
+                    <td style="display:none;">{{ i.product.id }}</td>
+                    <td>{{ i.product.barcode }}</td>
+                    <td>{{ i.quantity }}</td>
+                    <td>{{ i.depot.name }}</td>
+                    <td style="display:none;"></td>
+                    <td style="display:none;">{{ i.depot.id }}</td>
+                    <td>{% if level < 5 %}
+                            <a href="javascript:void(0)" class="blue">删</a>
+                        {% else %}
+                        权限不足
+                        {% endif %}
+                    </td>
+                    <td style="display:none;">{{ i.id }}</td>
+                    <td style="display:none;">{{ i.quantity }}</td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        {% else %}
+            <table class="table_contain" id="in_list">
+                <thead>
+                <tr>
+                    <td>编号</td><td>单据号</td><td>店铺</td><td>件数 / 金额</td><td>仓管</td>
+                    <td>经办</td><td>日期</td><td>状态</td><td>操作</td>
+                </tr>
+                </thead>
+                {% for i in out_list.object_list %}
+                    <tr>
+                    <td>{{ forloop.counter }}</td>
+                    <td><a href="?act=detail&id={{ i.id }}" class="blue">{{ i.code }}</a></td>
+                    <td>{{ i.shop }}</td>
+                    <td>{{ i.total.0 }}件{% if level < 5 %} / ￥{{ i.total.1 }}{% endif %}</td>
+                    <td><a href="/staff/?id={{ i.keeper_id }}" class="blue">{{ i.keeper.name }}</a></td>
+                    <td><a href="/staff/?id={{ i.staff1_id }}" class="blue">{{ i.staff1 }}</a>
+                    </td>
+                    <td>{{ i.date|date:"Y-m-d" }}</td>
+                    <td>
+                        {% if i.hidden %}已删除
+                        {% else %}正常
+                        {% endif %}
+
+                    </td>
+                    <td>{% if level < 5 %}
+                        <a href="?act=edit&id={{ i.id }}" class="blue" {% if i.note %} title="备注：{{ i.note }}"{% endif %}>提要改</a>
+                        {% if not i.hidden %}
+                        <a href="javascript:void(2)" name="{{ i.id }}" class="blue">删</a>
+                        {% endif %}/
+                        <a href="?act=detail&id={{ i.id }}" class="blue">详单改</a>
+                        {% else %}
+                        权限不足
+                        {% endif %}
+                    </td>
+                    </tr>
+                {% endfor %}
+            </table>
+        {% endif %}
+        </div>
+    </div>
+    <div id="pager_div">
+        <ul class="pages">
+
+        {% if out_list.has_previous %}
+            <li><a href="?{{ url }}"><img src="/static/images/css/first_small.png" class="png"/> 首页</a></li>
+            <li class="pgNext"><a href="?{{ url }}page={{ out_list.previous_page_number }}" ><img src="/static/images/css/previou_small.png" class="png"/> 上一页</a></li>
+        {% endif %}
+        {% for p in page_range %}
+            {% ifequal p out_list.number %}
+                <li class="page-number pgCurrent">{{p}}</li>
+            {% else %}
+                <li class="page-number"><a href="?{{ url }}page={{p}}" title="第{{p}}页" >{{p}}</a></li>
+            {% endifequal %}
+        {% endfor %}
+        {% if out_list.has_next %}
+            <li class="pgNext"><a href="?{{ url }}page={{ out_list.next_page_number }}" >下一页 <img src="/static/images/css/next_small.png" class="png"/></a></li>
+            <li><a href="?{{ url }}page={{ out_list.paginator.num_pages }}">末页 <img src="/static/images/css/last_small.png" class="png"/></a></li>
+        {% endif %}
+
+        </ul>
+    {% endif %}
+        </div>
+    <div id="confirm"  style="display:none;">
+        <h2>是否确认？</h2>
+        <button type="button" id="yes" class="m_btn"/><span><img src="/static/images/css/ok_small.png"></span> Yes</button>
+        <button type="button" id="no" class="m_btn"/><span><img src="/static/images/css/cross_small.png"></span> No</button>
+        <p></p>
+    </div>
+{% endblock %}

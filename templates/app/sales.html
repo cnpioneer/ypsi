@@ -1,0 +1,368 @@
+﻿{% extends "simple.html" %}
+{% block js-css %}
+    <script type="text/javascript" src="/static/js/jquery-1.6.4.min.js"></script>
+    <script type="text/javascript" src="/static/js/jquery.autocomplete.min.js"></script>
+    <script type="text/javascript" src="/static/js/jquery.blockUI.js"></script>
+    <script type="text/javascript" src="/static/js/jquery.csrf.js"></script>
+    <script type="text/javascript" src="/static/js/jquery.jgrowl.min.js"></script>
+    <link rel="stylesheet" type="text/css" href="/static/css/jquery.jgrowl.css">
+
+    <script type="text/javascript">
+    function un_block(){$.unblockUI();}
+
+    $().ready(function() {
+        $("#name_input").focus();
+        $("#cart_tb input").live("click",function(){
+            $(this).closest("tr").detach();
+            if ($("#cart_tb tbody tr").length<1){
+                $("#pay_btn").attr("disabled",true);
+                $("#cart_div").fadeOut(1000);
+            }
+        });
+
+        //$("#name_input").addClass("ac_init");
+        function showErr(str){
+            $.jGrowl(str,{header:"错误提示",timeout:5000});
+            //!callback || (flag=true);
+            //$("#err_msg").html("<li>"+str+"</li>");
+            //$("#err_msg").fadeToggle();
+            //setTimeout('$("#err_msg").fadeToggle()',3000);
+        }
+        function check_pname(){
+            var flag = true;
+            $("#cart_tb tbody tr").each(function(){
+                if ($("td:eq(0)",this).text()==$("#name_input").val().replace(/(^\s*)|(\s*$)/g, "") && $("#name_input").val().replace(/(^\s*)|(\s*$)/g, "").length>0){
+                    showErr("已有同类商品存在");
+                    $("#m_btn").attr("disabled",true);
+                    flag = false;
+                    return flag;
+                     }
+                else {
+                    $("#m_btn").attr("disabled",false);
+                    return flag;
+                }
+            });
+            return flag;
+        }
+        function check_price(obj){
+            var flag =false;
+            obj.replace(/(^\s*)|(\s*$)/g, "");
+            if (!/^\d+\.?\d{0,2}$/.test(obj)){
+                showErr("价格/折扣应为整数或最多两位小数的数字");
+                $("#pay_btn").attr("disabled",true);
+            }
+            else{ $("#pay_btn").attr("disabled",false);
+            flag = true;}
+            return flag;
+        }
+        function check_quantity(obj){
+            obj.replace(/(^\s*)|(\s*$)/g, "");
+            if (!/^[1-9][0-9]*$/.test(obj)){
+                showErr("请正确输入数量");
+                return false;
+            }
+            else{return true;}
+
+        }
+        function to2bits(flt) {
+            if(parseFloat(flt) == flt){return Math.round(flt * 100) / 100;}
+            else{return 0;}
+            // 到4位小数, return Math.round(flt * 10000) / 10000;
+            }
+        function sum_money(){
+            var total = 0;
+            $("#discount_input").val().length > 0 || $("#discount_input").val("0");
+            if (check_price($("#discount_input").val())){
+            $("#cart_tb tbody tr").each(function(){
+                if (check_price($("td:eq(2)",this).text()) && check_quantity($("td:eq(3)",this).text())){
+                    var t_sum =to2bits($("td:eq(2)",this).text()*$("td:eq(3)",this).text());
+                    $("td:eq(4)",this).text(t_sum);
+                    total = to2bits(total + t_sum);
+                }}
+            );
+            $("#total_money").html(to2bits(total-$("#discount_input").val()));}
+        }
+        $(".editable").live("blur",function(){
+            if ($(this).parent().index()==2 ){ !(check_price($(this).text())) || sum_money()}
+            else { !(check_quantity($(this).text())) || sum_money()}
+            
+        });
+        $("#discount_input").live("blur",function(){
+            if (check_price($(this).val()) ){
+                parseInt($(this).val()) > parseInt($("#total_money").text()) ? showErr("折扣金额不可大于应付总金额...") : sum_money();}
+        });
+
+        $(".ac_input").focus(function() {
+            $(this).addClass("focus");
+        }).blur(function() {
+            $(this).removeClass("focus");
+        });
+        function next_step(event, data, formatted) {
+            check_pname();
+            if (data){
+                $("#price_input").val("0");
+                $("#quantity_input").val("1");
+            }
+	    }
+        $("#price_input").keypress(function(event) {
+        if (!$.browser.mozilla) {
+            if (event.keyCode && (event.keyCode < 48 || event.keyCode > 57) && event.keyCode != 46) {
+                // ie6,7,8,opera,chrome
+                event.preventDefault();
+            }
+        }
+        else {
+            if (event.charCode && (event.charCode < 48 || event.charCode > 57) && event.keyCode != 46) {
+                // firefox
+                event.preventDefault();
+            }
+        }
+        });
+        $("#quantity_input").keypress(function(event) {
+        if (event.keyCode && (event.keyCode < 48 || event.keyCode > 57)) {
+        //小键盘数字键
+            event.preventDefault();
+        }
+        });
+
+        $("#name_input").result(next_step).next().click(function() {
+		    $(this).prev().search();
+	    });
+        function formatItem(row) {
+            if (row[2].length>0){
+                return row[0] + "\t条码:" + row[1] + "\t店内库存:" + row[2]; //此处可定制提示信息
+            }
+            else{return row[0]}
+        }
+
+        function formatResult(row) {
+            return row[0];
+        }
+        $("#name_input").autocomplete('/pac/', {
+            minChars: 0,
+            max:100,
+            width: 376,
+            cacheLength: 0,
+            mustMatch:true,
+            autoFill: false,
+            formatItem: formatItem,
+            formatResult: formatResult //格式化结果输出
+        });
+        $("#name_input").result(function(event, data, formatted) {
+            if (data){
+                if (parseInt(data[2])>0){
+                    $("#m_btn").attr("disabled",false);
+                    }
+                else {$("#m_btn").attr("disabled",true);
+                showErr("该商品当前店内可用库存为零");}
+                $("#price_input").val(data[3]);
+                $("#product_id_input").val(data[4]);
+                $("#size_input").val(data[5].replace(/"/g,''));
+                $("#quantity_hide_input").val(data[2]);}
+
+            else {$("#product_id_input").val("")}
+
+        });
+        function formatItem2(row) {
+             return row[0] + "\t卡号:" + row[1] + "\t电话:" + row[2];
+        }
+         $("#customer_input").autocomplete('/csearch/', {
+            minChars: 1,
+            max:100,
+            width: 300,
+            autoFill: false,
+            formatItem: formatItem2,
+            formatResult: formatResult //格式化结果输出
+        });
+        $("#customer_input").result(function(event, data, formatted) {
+            if (data){
+                $("#customer_id_input").val(data[3]);}
+
+        });
+
+        $("#m_btn").click(function(){
+            if (check_pname() && check_price($("#price_input").val()) && check_quantity($("#quantity_input").val())){
+                if ($("#name_input").val().length<1){
+                    $("#m_btn").attr("disabled",true);
+                    showErr("商品名称不能为空");
+                    return false;
+                }
+                else if (parseInt($("#quantity_input").val()) > parseInt($("#quantity_hide_input").val())){
+                    showErr("销售数量不能大于店内库存");
+                    return false;
+                }
+                else{
+                $("#cart_div").fadeIn(1000);
+                $("#pay_tb").fadeIn(1000);
+                var str = "<tr>\n"+
+                        "<td ><a href='/depots/product/?id="+$("#product_id_input").val()+"' class='blue' target='_blank'>"+$("#name_input").val()+"</a></td>\n"+
+                        "<td >"+$("#size_input").val()+"</td>\n"+
+                        "<td ><div contenteditable='true' class='editable'>"+$("#price_input").val()+"</div></td>\n"+
+                        "<td ><div contenteditable='true' class='editable'>"+$("#quantity_input").val()+"</div></td>\n"+
+                        "<td >"+to2bits($("#price_input").val()*$("#quantity_input").val())+"</td>\n"+
+                        "<td style=width:10%;><input type='image' src='/static/images/css/delete16.png' title='删除当前项'/></td>\n"+
+                        "<td style='display:none'>"+$("#product_id_input").val()+"</td>\n" +
+                        "<td style='display:none'>"+$("#quantity_hide_input").val()+"</td></tr>"
+
+                $('#cart_tb').append(str);
+                $(".ac_input:lt(3)").val("");
+                $("#pay_btn").attr("disabled",false);
+                sum_money();
+            }}
+            
+        });
+        $("#pay_btn").click(function(){
+            var flag = false;
+            var flagB = false;
+            if (check_price($("#discount_input").val()) ){
+                if (parseInt($("#discount_input").val())>parseInt($("#total_money").text())) {
+                    showErr("折扣金额不可大于应付总金额...");
+                }
+                else flag=true;
+            }
+            $('#cart_tb tr:gt(0)').each(function(){
+                //console.log(parseInt($($(this).children("td")[3]).text()));
+                //console.log(parseInt($($(this).children("td")[7]).text()));
+                if (check_price($($(this).children("td")[2]).text()) && check_quantity($($(this).children("td")[3]).text()) && /^[1-9][0-9]*$/.test($($(this).children("td")[6]).text())){
+                    flagB = true;
+                    if (parseInt($($(this).children("td")[3]).text()) > parseInt($($(this).children("td")[7]).text())) {
+                    flagB = false;
+                    showErr("销售数量不能大于店内库存");
+                    return false;
+                }
+                }
+
+                else {return false;}
+            });
+            if (flag && flagB){
+            var temp_str=new Array();
+            for (var i=0;i<$('#cart_tb tr:gt(0)').length;i++){
+                var tds = $($("#cart_tb tr:gt(0)")[i]).children("td");
+                temp_str.push("{'product':'"+ $(tds[6]).text() +"','price':'"+ $(tds[2]).text() +"','quantity':'"+ $(tds[3]).text() +"'}");}
+                var postData = "{'id':'','hidden':'','code':'"+ $("#code_input").val() +"','customer':'"+ $("#customer_id_input").val()+"','discount':'"+ $("#discount_input").val()+"','note':\""+$("#note_input").val().replace(/"/g,"'")+"\",'orderDetail':["+ temp_str +"]}";
+                //var pd = "code="+$("#code_input").val()+"&customer="+$("#customer_id_input").val()+"&discount="+ $("#discount_input").val()+"&note="+$("#note_input").val();
+                $.ajax({
+                    type: "POST",
+                    url: "/sales/add/",
+                    contentType:"text/plain",
+                    dataType: "json",
+                    data:postData,
+                    timeout:10000,
+                    beforeSend: function () {
+                    $.blockUI({ message: '<h3><img src="/static/images/css/load.gif" /> 订单提交中...</h3>'});
+                    $(this).attr("disabled",true);},
+                    success:function(msg) {
+                        if (msg.flag){
+                        $.blockUI({ message: '<h3>更新完成</h3>',timeout:1000});
+                     $("#cart_tb tr:gt(0)").remove();
+                        $(".ac_input").val("");
+                        $("#product_id_input").val("");
+                        $("#pay_btn").attr("disabled",true);
+                        $("#cart_div").fadeOut(1000);
+                    }
+                        else{
+                            $.blockUI({ message: '<h3>'+msg.data+'</h3>',timeout:2000});
+                        }
+                        //setTimeout("window.location.reload()",1000);
+                    },
+                    error:function(msg,status,type){
+                        $.blockUI({ message: '<h3>数据更新失败,请复核数据后再次提交</h3>\n'+type,timeout:3000});
+                    }
+
+                })
+            }
+        });
+        $("#add_customer_btn").click(function(){
+            $("#customer_frame").attr({src:"/customer/mini"});
+            //$("#customer_frame").contents().find("#add_customer_form").each(function(){this.reset();});
+            $.blockUI({
+                message: $("#frame_pa"),
+                css: {
+                    width: '600px',
+                    height: '500px',
+                    left: ($(window).width() - 600) / 2 + 'px',
+                    top: '15%'
+                }
+            });
+            $(".blockOverlay").attr("title","点击返回页面").click($.unblockUI);
+        });
+
+         
+    });
+</script>
+{% endblock %}
+{% block nav %}
+	<li><a href="/">Home</a></li>
+        <li class="act">销售管理</li>
+        <li><a href="/depots/">库存管理</a></li>
+        <li><a href="/staff/">个人资料</a></li>
+        <li><a href="/customer/">会员管理</a></li>
+{% endblock %}
+{% block head-foot%}
+    <div id="head-foo">
+    <div id="head-foot">
+        <ul>
+            <li><a href ="#">新增订单</a></li>
+            <li><a href ="/sales/show/">订单查询 ／ 修改</a></li>
+            <li><a href ="/sales/chart/">销售统计</a></li>
+        </ul>
+    </div>
+    </div>
+{% endblock %}
+{% block contents %}
+    {% if level > 4 %}
+    <div id="add_cart" class="add_cart">
+        <label for="name_input">商品名称: </label>
+        <input type="text" id="name_input" class="ac_input ac_init png" maxlength="20" style="width:240px"/>
+        <label for="price_input">价格: </label>
+        <input type="text" id="price_input" value="0" class="ac_input" style="width: 80px" />
+        <label for="quantity_input">数量: </label>
+        <input type="text" id="quantity_input" value="1" class="ac_input" style="width: 40px" />
+        <button type="submit" id="m_btn" class="m_btn"><span><img src="/static/images/css/ok_small.png" class=" png"></span> 确定</button>
+        <input type="text" id="product_id_input" style="display: none"/>
+        <input type="text" id="size_input" style="display:none;"/>
+        <label for="customer_input">顾客姓名/卡号/手机: </label>
+        <input type="text" id="customer_input" class="ac_input png" maxlength="10" title="请最少输入一个需要查询的会员关键字" style="width:100px"/>
+        <input type="text" id="customer_id_input" style="display: none"/>
+        <input type="text" id="quantity_hide_input" style="display: none"/>
+        <button type="submit" id="add_customer_btn" class="m_btn"><span><img src="/static/images/css/user_small.png" class=" png"></span> 新</button>
+    </div>
+    <div id ="cart_div" style="display:none">
+    <table id="cart_tb"  class="table_cart" style="margin-top:40px">
+        <thead>
+        <tr>
+            <td>名称</td>
+            <td >规格</td>
+            <td>价格</td>
+            <td>数量</td>
+            <td>小计</td>
+            <td>操作</td>
+            <td style="display:none">product_id</td>
+            <td style="display:none">quantity_hide</td>
+        </tr>
+        </thead>
+    </table>
+    <table id="pay_tb" class="table_pay" >
+        <tr>
+            <td >
+                <label for="code_input">单据编号: </label>
+                <input type="text" id="code_input" class="ac_input" style="width: 80px" />
+            </td>
+            <td >
+                <label for="note_input">备注: </label>
+                <input type="text" id="note_input" class="ac_input"  maxlength="100" style="width: 200px" /></td>
+            <td style="text-align: right;">折扣:</td>
+            <td><input type="text" id="discount_input" class="ac_input" value="0" style="width: 60px" /></td>
+            <td>总计：<span id="total_money">0</span></td>
+            <td><button type="button" id="pay_btn" class="m_btn" ><span><img src="/static/images/css/cart_small.png" class=" png"> 确定支付</span></button></td>
+            <td style="display:none"></td>
+        </tr>
+    </table>
+</div>
+    <div id="frame_pa" style="display: none;" >
+        <iframe id="customer_frame" scrolling="no"  frameborder="0" width="100%" height="100%"></iframe>
+    </div>
+    {% else %}
+        <div style="text-align: center;margin-top: 60px;font-size: 16px">只有店长、店员可进行销售</div>
+    {% endif %}
+{% endblock %}

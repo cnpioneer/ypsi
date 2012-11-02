@@ -1,0 +1,260 @@
+﻿{% extends "simple.html" %}
+{% block js-css %}
+    <script type="text/javascript" src="/static/js/jquery-1.6.4.min.js"></script>
+    <script type="text/javascript" src="/static/js/highcharts.js"></script>
+    <script type="text/javascript" src="/static/js/jquery.autocomplete.min.js"></script>
+    <script type="text/javascript" src="/static/js/jquery.blockUI.js"></script>
+   	<script type="text/javascript">
+    function un_block(){$.unblockUI();}
+    $().ready(function() {
+        $(".ac_input").focus(function() {$(this).addClass("focus");})
+                      .blur(function() {$(this).removeClass("focus");});
+        $("#search_btn").attr("disabled",true);
+        function formatItem(row) {
+            return row[0] + "\t条码:" + row[1] + "\t库存:" + row[2];
+        }
+
+        function formatResult(row) {
+            return row[0];
+        }
+
+        $("#name_input").autocomplete('/pac/?type=mini', {
+            minChars: 2,
+            max:500,
+            width: 350,
+            mustMatch: true,
+            formatItem: formatItem,
+            formatResult: formatResult
+        });
+
+         $("#name_input").result(function(event, data, formatted) {
+            if (data){
+                $("#pid").val(data[3]);
+                $("#search_btn").attr("disabled",false);
+            }
+         });
+         $("#name_input").blur(function(){
+             if ($("#name_input").val().length>0){
+             $("#depot_input").attr("disabled",false);
+             $("#depot_input").addClass("ac_init png");
+             $("#depot_input").autocomplete('/dac/?pid='+$("#id_input").val(), {
+                    minChars: 0,
+                    max:100,
+                    width: 287,
+                    mustMatch: true,
+                    formatItem: function(row){
+                         return row[0] + "\t此产品数量:" + row[1] + "\t总量:" + row[2];
+                                    },
+                    formatResult: formatResult
+                });
+             }
+         });
+        $('#search_btn').click(function() {
+            var r_url = "/depots/in/?act=search&id="+$("#pid").val()+"&did="+$("#depot_id").val();
+            if ($("#in_or_out").val()==2){ r_url = "/depots/out/?act=search&id="+$("#pid").val()+"&did="+$("#depot_id").val()}
+            //$("#p_search").attr("action",r_url).submit();
+            window.location=r_url;
+        });
+         
+
+        $("#ddetail").change(function(){
+            if ($("option:selected",this).attr("type")=="shop"){window.location="?act=shop&id="+$(this).val();}
+            else{window.location="?act=depot&id="+$(this).val();}
+                });
+        if ($("#h_list").text()){
+            $($("#h_list").text().split(",")).each(function(i,n){
+                $("#r_list tr:eq("+(i+1)+") td:eq(4)").html(n);
+            })}
+        $("[href='javascript:void(0)']").click(
+            function(){
+                $("#customer_frame").attr({src:"/product/mini/?id="+this.name});
+                $.blockUI({
+                message: $("#frame_pa"),
+                css: {
+                    width: '600px',
+                    height: '500px',
+                    left: ($(window).width() - 600) / 2 + 'px',
+                    top: '15%'
+                }
+            });
+                $(".blockOverlay").attr("title","点击返回页面").click($.unblockUI);
+            });
+        var chartOptions ={
+           chart: {
+               renderTo: "",
+               borderWidth: 0,
+               borderColor:'#ddd',
+               plotBorderWidth: null
+          },
+          title: {
+             text: '',
+             style: {
+             color: '#555',
+             font: "20px simhei,Verdana, sans-serif"
+          }
+          },
+          tooltip: {
+             formatter: function() {
+                return '<b>'+ this.point.name +'</b>: '+ this.percentage +' %  库存商品'+this.point.y +' 件';
+             }
+          },
+          plotOptions: {
+              pie: {
+                    allowPointSelect: true,
+                                       cursor: 'pointer',
+                                       dataLabels: {
+                                           enabled: true,
+                                           color: '#777',
+                                           connectorColor: '#000',
+                                           formatter: function() {
+                                               return  this.percentage +' %';
+                                           }
+                                       },
+                                       showInLegend: true
+                                   }
+                               },
+           series: [{
+             type: 'pie',
+             name: 'depots show',
+             data: []
+          }]
+       };
+
+        function showChart(name,div,type){
+           $.ajax({
+           type: "GET",
+           url: "/depots/charts/?type="+type,
+           dataType: "json",
+           timeout:10000,
+           success:function(msg){
+               chartOptions.series[0].data=msg.data;
+               chartOptions.chart.renderTo=div;
+               chartOptions.title.text=name;
+               new Highcharts.Chart(chartOptions);
+           },
+           error:function(msg){$.blockUI({ message: '<h3>系统读取库存数据错误，请联系管理员解决</h3>',timeout:2000});}
+           });
+        }
+        if ($("#c1").length){
+        showChart("仓库库存一览","c1","depots");
+        showChart("各店店内库存一览","c2","shops");}
+    });
+	</script>
+{% endblock %}
+{% block nav %}
+        <li><a href="/">Home</a></li>
+        <li><a href="/sales/">销售管理</a></li>
+        <li class="act">库存管理</li>
+        <li><a href="/staff/">个人资料</a></li>
+        <li><a href="/customer/">会员管理</a></li>
+{% endblock %}
+{% block head-foot%}
+    <div id="head-foo">
+    <div id="head-foot">
+        <ul>
+            <li><a href ="#">概览</a></li>
+            <li><a href ="/depots/remit/">汇款</a></li>
+            <li><a href ="/depots/in/">入库</a></li>
+            <li><a href ="/depots/out/">出库</a></li>
+            <li><a href ="/category/" target="_blank">类别管理</a></li>
+            <li><a href ="/depots/product/">产品细目</a></li>
+        </ul>
+    </div>
+    </div>
+{% endblock %}
+{% block contents %}
+    <div>
+    <form id="p_search" action="." method="get">
+        <label for="name_input">产品出入库记录查询：</label><input type="text" id="name_input" class="ac_input" maxlength="20" style="width:120px" title="请最少输入两个关键字符便于查找"/>
+        <input type="text" id="pid" style="display: none"/>
+        <label for="in_or_out" style="margin-left: 20px">选择入库 / 出库</label>
+            <select id="in_or_out">
+                <option value="1">入库记录</option>
+                <option value="2">出库记录</option>
+            </select>
+        <label for="depot_id" style="margin-left: 20px"> 选择仓库</label>
+            <select id="depot_id">
+                <option value="0">全部仓库</option>
+                {% for d in d_list %}<option value="{{ d.id }}" >{{ d.name }}</option>{% endfor %}
+            </select>
+        <button type="button" class="m_btn" id="search_btn" style="margin-left: 20px"><span><img src="/static/images/css/ok_small.png" class="png"></span> 提交查询</button>
+    </form>
+    </div>
+    <div style="margin-top: 40px;border: 1px solid #cccccc;border-radius: 6px;">
+    <div style="border-bottom: 1px solid #ccc;padding: 4px 10px ;background-color:#eeeeee;border-radius: 5px 5px 0 0;overflow:auto;*height:1%;">
+        <div style="float:left;"><img src="/static/images/css/depot_small.png" class="png"> {{ page_title }}</div>
+        <div style="float:right;">
+            {% if rows %}共{{ rows }}条记录 {{ r_list.number }}/{{ r_list.paginator.num_pages }}页 {% endif %}
+            <label for="ddetail"><img src="/static/images/css/search_small2.png"> 选择查看库存明细</label>
+            <select id="ddetail">
+                <option>请选择</option>
+                <optgroup label="店铺库存" style=background:#e4e4e4>
+                {% for s in s_list %}<option value="{{ s.id }}" type="shop">{{ s.name }}</option>{% endfor %}
+                </optgroup>
+                {% if level < 5%}
+                <optgroup label="仓库库存" style=background:#e4e4e4>
+                {% for d in d_list %}<option value="{{ d.id }}" type="depot">{{ d.name }}</option>{% endfor %}
+                </optgroup>
+                {% endif %}
+            </select>
+        </div>
+    </div>
+    {% if p_list %}
+        <table class="table_contain" id="r_list">
+                <thead>
+                <tr>
+                    <td>名称</td><td>条码</td><td>尺寸</td><td>入库均价</td><td>当前库存</td><td>仓库总库存</td><td>状态</td><td>操作</td>
+                </tr>
+                </thead>
+
+                {% for pd in r_list.object_list %}
+                    <tr>
+                    <td><a href="/depots/product/?id={{ pd.id }}" class="blue">{{pd.name }}</a></td>
+                    <td>{{ pd.code }}</td>
+                    <td>{{ pd.size }}</td>
+                    <td>不予显示</td>
+                    <td></td>
+                    <td>{{ pd.p_str.1 }}</td>
+                    <td>
+                        {% if r.hidden %}已删除
+                        {% else %}正常
+                        {% endif %}
+                    </td>
+                    <td><a href="javascript:void(0)" class="blue" name={{ pd.id }}>修改</a></td>
+                    </tr>
+                {% endfor %}
+            </table>
+        <div id="h_list" style="display: none;">{{ st_list|join:"," }}</div>
+        <div id="frame_pa" style="display: none;" >
+        <iframe id="customer_frame" scrolling="no"  frameborder="0" width="100%" height="100%"></iframe>
+    </div>
+    {% else %}
+    <div style="margin-top: 40px;height:400px">{{ sData }}
+        <div id="c1" style="width:49.9%; height:400px; margin: 0 auto;float:left;"></div>
+        <div id="c2" style="width:49.9%; height:400px; margin: 0 auto;float:right;"></div>
+    </div>
+    {% endif %}
+</div>
+    {% if p_list %}
+    <div id="pager_div">
+        <ul class="pages">
+        {% if r_list.has_previous %}
+            <li><a href="{{ url }}"><img src="/static/images/css/first_small.png" class="png"/> 首页</a></li>
+            <li class="pgNext"><a href="{{ url }}&page={{ r_list.previous_page_number }}" ><img src="/static/images/css/previou_small.png" class="png"/> 上一页</a></li>
+        {% endif %}
+        {% for p in page_range %}
+            {% ifequal p r_list.number %}
+                <li class="page-number pgCurrent">{{p}}</li>
+            {% else %}
+                <li class="page-number"><a href="{{ url }}&page={{p}}" title="第{{p}}页" >{{p}}</a></li>
+            {% endifequal %}
+        {% endfor %}
+
+        {% if r_list.has_next %}
+            <li class="pgNext"><a href="{{ url }}&page={{ r_list.next_page_number }}" >下一页 <img src="/static/images/css/next_small.png" class="png"/></a></li>
+            <li><a href="{{ url }}&page={{ r_list.paginator.num_pages }}">末页 <img src="/static/images/css/last_small.png" class="png"/></a></li>
+        {% endif %}
+        </ul>
+    </div>
+    {% endif %}
+{% endblock %}

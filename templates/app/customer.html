@@ -1,0 +1,263 @@
+﻿{% extends "simple.html" %}
+{% block js-css %}
+    <script type="text/javascript" src="/static/js/jquery-1.6.4.min.js"></script>
+    <script type="text/javascript" src="/static/js/jquery.blockUI.js"></script>
+    <script type="text/javascript" src="/static/js/jquery.autocomplete.min.js"></script>
+    <script type="text/javascript" src="/static/js/highcharts.js"></script>
+   	<script type="text/javascript">
+    function un_block(){$.unblockUI();}
+    $().ready(function() {
+        $("#search_btn").attr("disabled",true);
+        $("#r_list tbody tr").live("mouseover",function(){
+           $(this).addClass("focus");
+        });
+        $("#r_list tbody tr").live("mouseout",function(){
+            $(this).removeClass("focus");
+        });
+        function showFrame(id){
+            $("#customer_frame").attr({src:"/customer/mini/?id="+id});
+            $.blockUI({
+                message: $("#frame_pa"),
+                css: {
+                    width: '600px',
+                    height: '500px',
+                    left: ($(window).width() - 600) / 2 + 'px',
+                    top: '15%'
+                }
+        });
+        $(".blockOverlay").attr("title","点击返回页面").click($.unblockUI);
+        }
+        $("[href='javascript:void(0)']").click(
+            function(){
+                showFrame(this.name);
+            });
+        $("#show_btn").click(function(){
+             showFrame(this.name);
+        });
+        function formatItem(row) {
+            if (row[2].length>0){
+                return row[0] + "\t条码:" + row[1] + "\t店内库存:" + row[2]; //此处可定制提示信息
+            }
+            else{return row[0]}
+        }
+         $("#customer_input").autocomplete('/csearch/', {
+            minChars: 1,
+            max:100,
+            width: 300,
+            cacheLength:1,
+            autoFill: false,
+            formatItem: formatItem,
+            formatResult: function(row){return row[0]} //格式化结果输出
+        });
+        $("#customer_input").result(function(event, data, formatted) {
+            if (data){
+                $("#customer_id_input").val(data[3]);
+                $("#search_btn").attr("disabled",false);
+            }
+
+        });
+        function showChart(surl){
+           $.ajax({
+           type: "GET",
+           url: surl,
+           dataType: "json",
+           timeout:10000,
+           success:function(msg){
+               if (msg.date.length>0){
+               var chart;
+               chart = new Highcharts.Chart({
+					chart: {
+						renderTo: 'container',
+						defaultSeriesType: 'areaspline'
+					},
+					title: {
+						text: '历史消费曲线图'
+					},
+
+					xAxis: {
+						categories: msg.date
+
+					},
+					yAxis: {
+						min: 0,
+						title: {
+							text: '消费金额 (元)'
+						}
+					},
+                   legend: {
+                     enabled: false
+                    },
+
+					tooltip: {
+						formatter: function() {
+							return ''+
+								this.x +' 消费:'+ this.y +'元';
+						}
+					},
+					plotOptions: {
+						 areaspline: {
+                            fillOpacity: 0.5,
+                            dataLabels: {
+                               enabled: true
+                            }
+                        }
+
+					},
+				        series: [{
+						name: '消费数据',
+						data: msg.amount
+
+					}]
+				});
+           }
+               else{$("#container").html("<div style='color:#eee;line-height:300px;text-align:center;font-size:200px;font-family:simhei'>無</div>")}},
+           error:function(msg){$.blockUI({ message: '<h3>系统读取库存数据错误，请联系管理员解决</h3>',timeout:2000});}
+           });
+        }
+        if (window.location.search.indexOf("?id=")>-1 && window.location.search.indexOf("&act=chart")<0){
+            showChart(window.location.search+"&act=chart");
+        }
+        else if (window.location.search=="?act=search" && $("#show_btn").length>0){
+            showChart("?id="+$("#show_btn").attr("name")+"&act=chart");
+        }
+ 
+
+    })
+	</script>
+{% endblock %}
+{% block nav %}
+        <li><a href="/">Home</a></li>
+        <li><a href="/sales/">销售管理</a></li>
+        <li><a href="/depots/">库存管理</a></li>
+        <li><a href="/staff/">个人资料</a></li>
+        <li  class="act">会员管理</li>
+{% endblock %}
+{% block head-foot%}
+    <div id="head-foo">
+    <div id="head-foot">
+        <ul>
+            <li><a href ="/customer/">概览</a></li>
+            <li><a href ="javascript:void(0)" name="0">新增</a></li>
+            <li><a href ="/customer/?act=search">查询 / 统计</a></li>
+        </ul>
+    </div>
+    </div>
+{% endblock %}
+{% block contents %}
+
+{% if act == "search" or ctm%}
+     <form id="fm" method="POST" action="?act=search">
+        <div style="text-align: center;margin-top: 40px;*margin-top:20px;">
+                <label for="customer_input">会员名 / 编号 / 联系电话：</label>
+                <input type="text" id="customer_input" class="ac_input png" style="width: 280px;"/>
+                <input type="text" id="customer_id_input" name="id" style="display: none"/>
+                <button type="submit" id="search_btn" class="m_btn"><img src="/static/images/css/search_small.png" class=" png"> 会员详情获取 </button>
+                <span>[ 因用户数量较多，请至少输入一个关键字符 ]</span>
+        </div>
+     </form>
+    {% if ctm %}
+        <div style="margin-top: 40px;border: 1px solid #cccccc;border-radius: 6px;">
+        <div style="border-bottom: 1px solid #ccc;padding: 4px 10px 4px 10px;background-color:#eeeeee;border-radius: 5px 5px 0 0;_height: 1%;overflow:auto;">
+            <div style="float: left;"><img src="/static/images/css/user_small.png" class="png"> 会员"{{ ctm.name }}"详细资料</div>
+            <div style="float: right;">
+                <img src="/static/images/css/search_small2.png" class="png"> <a href="/sales/show/?cid={{ ctm.id }}"  class="blue">查看详细消费记录</a>
+            </div>
+        </div>
+        <div>
+            <table style="width: 100%;word-break:break-all;padding:0">
+                <tr>
+                    <td style="display: block;width: 25%">
+                        <ul style="list-style:square;line-height: 2em;color: #333;font-size: 14px;">
+                            <li>姓名：{{ ctm.name }}</li>
+                            <li>编码：{{ ctm.code }}</li>
+                            <li>电话：{{ ctm.telephone }}</li>
+                            <li>累计消费：{{ ctm.amount }} 元</li>
+                            <li>登记店铺：{{ ctm.shop.name }}</li>
+                            <li>登记住址：{{ ctm.address }}</li>
+                            <li>注册日期：{{ ctm.joindate|date:"Y-m-d" }}</li>
+                            <li>当前状态：{% if ctm.hidden %}已删除{% else %}正常{% endif %}</li>
+                            <li>备注：{{ ctm.note }}</li>
+                        </ul>
+                        <button type="button" id="show_btn" name="{{ ctm.id }}" class="m_btn" style="margin-left: 15%"><span><img src="/static/images/css/edit_small.png" class="png"></span> 会员信息修改</button>
+                    </td>
+                    <td>
+                       <div id="container" style="width: 100%; height: 300px; margin: 0 auto"></div>
+                    </td>
+                </tr>
+            </table>
+        </div>
+    </div>
+{% endif %}
+{% else %}
+<div style="margin-top: 40px;border: 1px solid #cccccc;border-radius: 6px;">
+    <div style="border-bottom: 1px solid #ccc;padding: 4px 10px ;background-color:#eeeeee;border-radius: 5px 5px 0 0;_height: 1%;overflow:hidden;">
+    {% if act == "showall" %}
+        <div style="float: left;"><img src="/static/images/css/article_small.png" class="png"> 全部会员列表</div>
+        <div style="float: right;">
+             共{{ rows }}条记录 {{ r_list.number }}/{{ r_list.paginator.num_pages }}页
+            <a href="/customer/" class="blue"><img src="/static/images/css/search_small2.png" class="png"> 本店会员列表</a>
+        </div>
+    {% else %}
+        <div style="float: left;"><img src="/static/images/css/article_small.png" class="png"> 本店会员列表</div>
+        <div style="float: right;">
+             共{{ rows }}条记录 {{ r_list.number }}/{{ r_list.paginator.num_pages }}页
+            <a href="?act=showall" class="blue"><img src="/static/images/css/search_small2.png" class="png"> 全部会员列表</a>
+        </div>
+    {% endif %}
+    </div>
+                <table class="table_contain" id="r_list">
+                    <thead>
+                    <tr >
+                        <td>姓名</td><td>编号</td><td>电话</td><td>总消费</td><td>所属</td><td>注册日期</td><td>状态</td><td>操作</td>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    {% for r in r_list.object_list %}
+                    <tr >
+                    <td><a href="?id={{ r.id }}" class="blue" title="{{ r.note }}">{{ r.name }}</a></td>
+                    <td><a href="?id={{ r.id }}" class="blue" title="{{ r.note }}">{{ r.code }}</a></td>
+                    <td>{{ r.telephone }}</td>
+                    <td>{% if r.amount %}{{ r.amount }}{% else %}0{% endif %}</td>
+                    <td>{{ r.shop }}</td>
+                    <td>{{ r.joindate|date:"Y-m-d" }}</td>
+                    <td>
+                        {% if r.hidden %}已删除
+                        {% else %}正常
+                        {% endif %}
+                    </td>
+                    <td>{% if level > 5 %}无权限{% else %}
+                            {% if level == 5 and shop_id != r.shop_id %}无权限{% else %}<a href="javascript:void(0)" class="blue" name="{{ r.id }}">修改</a>{% endif %}
+                        {% endif %}
+                    </td>
+                    </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+    </div>
+
+    <div id="pager_div">
+            <ul class="pages">
+            {% if r_list.has_previous %}
+                <li><a href="?act={{ act }}"><img src="/static/images/css/first_small.png" class="png"/> 首页</a></li>
+                <li class="pgNext"><a href="?page={{ r_list.previous_page_number }}&act={{ act }}" ><img src="/static/images/css/previou_small.png" class="png"/> 上一页</a></li>
+            {% endif %}
+            {% for p in page_range %}
+                {% ifequal p r_list.number %}
+                    <li class="page-number pgCurrent">{{p}}</li>
+                {% else %}
+                    <li class="page-number"><a href="?page={{p}}&act={{ act }}" title="第{{p}}页" >{{p}}</a></li>
+                {% endifequal %}
+            {% endfor %}
+
+            {% if r_list.has_next %}
+                <li class="pgNext"><a href="?page={{ r_list.next_page_number }}&act={{ act }}" >下一页 <img src="/static/images/css/next_small.png" class="png"/></a></li>
+                <li><a href="?page={{ r_list.paginator.num_pages }}&act={{ act }}">末页 <img src="/static/images/css/last_small.png" class="png"/></a></li>
+            {% endif %}
+            </ul>
+        </div>
+
+    {% endif %}
+    <div id="frame_pa" style="display: none;" >
+        <iframe id="customer_frame" scrolling="no"  frameborder="0" width="100%" height="100%"></iframe>
+    </div>
+{% endblock %}

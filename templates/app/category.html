@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<HTML>
+<HEAD>
+	<TITLE> 类别管理</TITLE>
+	<meta http-equiv="content-type" content="text/html; charset=UTF-8">
+	<link rel="stylesheet" href="/static/css/demo.css" type="text/css">
+	<link rel="stylesheet" href="/static/css/zTreeStyle.css" type="text/css">
+    <script type="text/javascript" src="/static/js/jquery-1.6.4.min.js"></script>
+    <script type="text/javascript" src="/static/js/jquery.blockUI.js"></script>
+    <script type="text/javascript" src="/static/js/jquery.csrf.js"></script>
+	<script type="text/javascript" src="/static/js/jquery.ztree.core-3.0.min.js"></script>
+	<script type="text/javascript" src="/static/js/jquery.ztree.excheck-3.0.min.js"></script>
+	<script type="text/javascript" src="/static/js/jquery.ztree.exedit-3.0.min.js"></script>
+	<SCRIPT LANGUAGE="JavaScript">
+
+    $().ready(function() {
+        var tp;
+        window.top.location.toString()==window.location.href ? tp=15 : tp=0;
+         $.blockUI({
+                message: $("#category_list"),
+                css: {
+                    width: '300px',
+                    height: '500px',
+                    left:  ($(window).width() - 300) / 2 + 'px',
+                    top: tp+'%'
+                }
+         });
+
+        $("#post_btn").click(function(){postJsondata()});
+
+        $.ajax({
+            type: 'GET',
+            dataType: "json",
+            cache:false,
+            url: "?act=list",
+            error: function() {
+                alert('请求失败');
+            },
+            success: function(data) {
+                var zNodes = data;
+                $.fn.zTree.init($("#treeDemo"), setting, zNodes);
+                $.fn.zTree.getZTreeObj("treeDemo").expandAll();
+            }
+        });
+
+        var setting = {
+            view: {
+                expandSpeed: "",
+
+                addHoverDom: addHoverDom,
+                removeHoverDom: removeHoverDom,
+                selectedMulti: false
+            },
+            edit: {
+                enable: true
+            },
+            data: {
+                simpleData: {
+                    enable: true,
+                    cache: false
+                }
+            },
+            callback: {
+                beforeAsync: beforeAsync,
+                beforeRemove: beforeRemove,
+                beforeRename: beforeRename
+            }
+    };
+
+    function filter(treeId, parentNode, childNodes) {
+        if (!childNodes) return null;
+        for (var i = 0, l = childNodes.length; i < l; i++) {
+            childNodes[i].name = childNodes[i].name.replace(/\.n/g, '.');
+        }
+        return childNodes;
+    }
+
+    function beforeAsync(treeId, treeNode) {
+        return treeNode ? treeNode.level < 5 : true;
+    }
+
+    function beforeRemove(treeId, treeNode) {
+        var zTree = $.fn.zTree.getZTreeObj("treeDemo");
+        zTree.selectNode(treeNode);
+        return confirm("确认删除 节点 " + treeNode.name + " 吗？");
+    }
+
+    function beforeRename(treeId, treeNode, newName) {
+        if (newName.length <1) {
+            alert("节点名称不能为空.");
+            return false;
+        }
+        return true;
+    }
+
+    var newCount = 1;
+
+    function addHoverDom(treeId, treeNode) {
+        var sObj = $("#" + treeNode.tId + "_span");
+        if ($("#addBtn_" + treeNode.id).length > 0) return;
+        var addStr = "<button type='button' class='add' id='addBtn_" + treeNode.id + "' title='add node' onfocus='this.blur();'></button>";
+        sObj.append(addStr);
+        var btn = $("#addBtn_" + treeNode.id);
+        if (btn) btn.bind("click", function() {
+            var zTree = $.fn.zTree.getZTreeObj("treeDemo");
+            zTree.addNodes(treeNode, {
+                id: (100 + newCount),
+                pId: treeNode.id,
+                name: "new node" + (newCount++)
+            });
+        });
+    }
+
+    function removeHoverDom(treeId, treeNode) {
+        $("#addBtn_" + treeNode.id).unbind().remove();
+    }
+
+
+    var templist =[];
+    function jsonGetAll(jdata) {
+        for (var i = 0; i < jdata.length; i++) {
+            templist.push({'id':jdata[i].id ,'name':jdata[i].name ,'pId': jdata[i].pId});
+            if (jdata[i].childs && jdata[i].childs.length > 0) {
+                jsonGetAll(jdata[i].childs);
+            }
+        }
+        return templist;
+    }
+
+    function postJsondata() {
+        var treeObj = $.fn.zTree.getZTreeObj("treeDemo");
+        var zznodes = treeObj.getNodes();
+        var json_str = (JSON.stringify(jsonGetAll(zznodes))).replace(/null/g, "None");
+        //console.log(json_str);
+
+        $.ajax({
+            type: 'POST',
+            url: '?act=edit',
+            data: json_str,
+            dataType: "JSON",
+            success:function(msg){
+                if (msg.flag){
+                    alert("类别更新成功");
+                    parent.location.reload();
+                }
+                else{
+                    alert("类别更新错误");
+                }
+
+            }
+        });
+        templist = [];
+
+        
+    }
+    });
+
+
+	</SCRIPT>
+	<style type="text/css">
+.ztree li button.add {margin-left:2px; margin-right: -1px; background-position:-112px 0; vertical-align:top; *vertical-align:middle}
+.ztree li button.add2 {margin-left:2px; margin-right: -1px; background-position:-112px -16px; vertical-align:top; *vertical-align:middle}
+	</style>
+</HEAD>
+
+<body >
+
+
+<div class="content_wrap" id="category_list">
+    <form ></form>
+	<div class="zTreeDemoBackground left">
+		<ul id="treeDemo" class="ztree"></ul>
+        {% if level < 5 %}<input type="submit" value=" 确定提交 "  id="post_btn">{% endif %}
+	</div>
+</div>
+
+
+</body>
+</HTML>

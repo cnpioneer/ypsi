@@ -1,0 +1,55 @@
+﻿{% extends 'simple.html' %}
+
+{% block js-css %}
+{% endblock %}
+{% block nav %}
+	<li><a href="/">Home</a></li>
+        <li><a href="/sales/">销售管理</a></li>
+        <li><a href="/depots/">库存管理</a></li>
+        <li class="act">个人资料</li>
+        <li><a href="/customer/">会员管理</a></li>
+{% endblock %}
+{% block head-foot%}
+    <div id="head-foo">
+    <div id="head-foot">
+        <ul>
+            <li><a href ="sale_list/">销售记录</a></li>
+            <li><a href ="pay_list/">薪资记录</a></li>
+            <li><a href ="change_pwd/">修改密码</a></li>
+        </ul>
+    </div>
+    </div>
+{% endblock %}
+{% block contents %}
+    <div id="p-left" >
+    {% if uk_list%}
+        <h2>共有 {{ uk_count }} 条记录等待补全</h2>
+        <table>
+        <thead>
+        <tr class="odd">
+            <th scope="col">序号</th>
+            <th scope="col">号段</th>
+            <th scope="col">来源用户</th>
+            <th scope="col">创建日期</th>
+            <th scope="col">号码属地</th>
+        </tr>
+        </thead>
+        <tbody>
+    {% for uk in uk_list %}
+        <tr>
+            <td>{{ forloop.counter }}</td>
+            <td>{{ uk.phone_no }}</td>
+            <td><a href="/user/{{ uk.owner.id }}">{{ uk.owner.name }}</a></td>
+            <td>{{ uk.c_date|date:"Y-m-d" }}</td>
+            <td><a href="/volunteer/{{ uk.id }}"><img src="/media/images/edit-icon.png" width="13"/> 编辑</a></td>
+        </tr>
+    {% endfor %}
+        </tbody>
+        </table>
+    {% else %}
+        <h2>我们已清理了库中所有号码、IP的属地！</h2>
+    {% endif %}
+    
+    </div>
+    <div id="p-right" >2</div>
+{% endblock %}

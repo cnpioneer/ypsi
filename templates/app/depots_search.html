@@ -1,0 +1,78 @@
+{% extends "simple.html" %}
+{% block js-css %}
+    <script type="text/javascript" src="/static/js/jquery-1.6.4.min.js"></script>
+    <script type="text/javascript" src="/static/js/jquery.autocomplete.min.js"></script>
+    <script type="text/javascript" src="/static/js/jquery.jgrowl.min.js"></script>
+    <link rel="stylesheet" type="text/css" href="/static/css/jquery.jgrowl.css">
+   	<script type="text/javascript">
+    $().ready(function() {
+        function showErr(str){$.jGrowl(str,{header:"错误提示",timeout:5000});}
+            
+        $(".ac_input").focus(function() {$(this).addClass("focus");})
+                      .blur(function() {$(this).removeClass("focus");});
+        function formatItem(row) {
+            var barcode;
+            row[1]==("None"||"") ? barcode="未录入" : barcode=row[1];
+                return row[0] + "\t条码:"+barcode ; //此处可定制提示信息
+        }
+        $("#name_input").result(function(event, data, formatted) {
+            if (data){
+                $("#id_input").val(data[2]);}
+        });
+        $("#name_input").autocomplete("/pac/?type=simple", {
+            minChars: 0,
+            max:20,
+            width: 300,
+            cacheLength: 1,
+            autoFill: false,
+            formatItem: formatItem,
+            formatResult: function(row){return row[0]} //格式化结果输出
+        });
+    $("#search_btn").click(function(){
+       if ($("#id_input").val().length>0){
+           $("#fm").attr("action","/depots/search/?id="+$("#id_input").val())
+       }
+       else{showErr("请输入必要参数");}
+    });
+    });
+	</script>
+{% endblock %}
+{% block nav %}
+        <li><a href="/">Home</a></li>
+        <li><a href="/sales/">销售管理</a></li>
+        <li class="act">库存管理</li>
+        <li><a href="/staff/">个人资料</a></li>
+        <li><a href="/customer/">会员管理</a></li>
+{% endblock %}
+{% block head-foot%}
+    <div id="head-foo">
+    <div id="head-foot">
+        <ul>
+            <li><a href ="/depots/">概览</a></li>
+            <li><a href ="/depots/remit/">汇款</a></li>
+            <li><a href ="/depots/in/">入库</a></li>
+            <li><a href ="/depots/out/">出库</a></li>
+            <li><a href ="/category/" target="_blank">类别管理</a></li>
+            <li><a href ="#">产品细目查询</a></li>
+        </ul>
+    </div>
+    </div>
+{% endblock %}
+{% block contents %}
+    <form id="fm" method="get">
+        <div style="text-align: center;margin-top: 40px">
+                <label for="name_input">产品名称 / 条形码：</label>
+                <input type="text" id="name_input" class="ac_input ac_init png" style="width: 280px;"/>
+                <input type="text" id="id_input"  style="display: none"/>
+                <button type="text" id="search_btn" class="m_btn"><img src="/static/images/css/search_small.png" class=" png"> 产品细目获取 </button>
+                <span style="color: #aaa;font-size: small;">[ 查询结果将包括产品所属分类，当前分布，总销量等详细情况 ]</span>
+        </div>
+    </form>
+    <div>
+        {% if pd %}
+            111
+        {% endif %}
+    </div>
+
+
+{% endblock %}

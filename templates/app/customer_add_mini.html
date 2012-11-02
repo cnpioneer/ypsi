@@ -1,0 +1,141 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<html>
+<head>
+    <meta http-equiv="Content-Type" content="text/html;charset=utf-8"/>
+    <link rel="shortcut icon" href="/static/images/favicon.ico"/>
+    <script type="text/javascript" src="/static/js/jquery-1.6.4.min.js"></script>
+    <script type="text/javascript" src="/static/js/jquery-ui-1.8.16.custom.min.js"></script>
+    <script type="text/javascript" src="/static/js/jquery.blockUI.js"></script>
+    <script type="text/javascript" src="/static/js/jquery.jgrowl.min.js"></script>
+    <script type="text/javascript" src="/static/js/jquery.csrf.js"></script>
+    <link rel="stylesheet" type="text/css" href="/static/css/style.css">
+    <link rel="stylesheet" type="text/css" href="/static/css/jquery-ui-1.8.16.custom.css">
+    <link rel="stylesheet" type="text/css" href="/static/css/jquery.jgrowl.css">
+
+    <script type="text/javascript">
+        $().ready(function() {
+            $("#iClose").click(function() {
+                parent.un_block();
+                });
+            //$.growlUI("错误提示","错误内容");
+            //$("#id_shop option[value!={{ request.user.get_profile.shop_id }}]").remove();
+            var customer_input = $.trim($(window.parent.document).find("#customer_input").val());
+            if (customer_input.length>0) $("#id_name").val(customer_input);
+            $("#id_joindate").datepicker({showOn: "both",constrainInput:"true"})
+            function input_err_display(obj,msg){
+                        $(obj).parent().children("ul").remove();
+                        //$(obj).parent().children("ul").animate({right:"50%"},function(){this.remove()})
+                        $(obj).before("<ul class='errorlist'><li>"+msg+"</li></ul>");
+
+            }            
+            function liveCheck(obj){ //obj，最小长度，错误信息，对应model
+                var logic,mini,msg,model;
+                if ($(obj).attr("id")=="id_name"){
+                    logic =/^[\u4e00-\u9fa5]{2,}$/;
+                    mini=2;
+                    msg ="会员名不能少于2位中文字符";
+                    model="name";
+                }
+                else if ($(obj).attr("id")=="id_code"){
+                    logic =/^[A-Za-z0-9]{4,20}$/;
+                    msg ="编号由4位以上数字及字母组成";
+                    model="code";
+                }
+                else if ($(obj).attr("id")=="id_telephone"){
+                    logic =/^([1-9]\d{6,7})|([1-9]\d{10})$/;
+                    msg ="只可为电话或手机号码";
+                    model="telephone";
+                }
+                else return;
+
+
+                    if ( mini ? (($(obj).val().length<mini) || !logic.test($(obj).val())) : (($(obj).val().length>0) && !logic.test($(obj).val())) ){
+                    input_err_display(obj,msg);
+                    }
+                    else{$(obj).parent().children("ul").remove();}
+
+
+
+                if ($(obj).val().length>0 && ($(obj).closest("td").children("ul")).length<1){
+                    $.ajax({
+                        type: "GET", //提交方式
+                        cache: true,
+                        url: "/customer/check/?model="+model+"&data="+$.trim($(obj).val()),  //提交地址
+                        dataType: "text",
+                        beforeSend:function(){$(obj).addClass("ac_loading");},
+                        complete: function() {$(obj).removeClass("ac_loading");} ,
+                        success: function (bmsg) {//根据返回状态，给出相关提示
+                            if (bmsg>0){
+                                //input_err_display(obj,"有"+bmsg+"项重复记录，是否已入登记?");
+
+                                //$.growlUI(,{ life: 3000 });
+                                //$.jGrowl("<a href='/customer/checkdata/?model="+model+"&data="+$.trim($(obj).val())+"'>会员库此项有 "+bmsg+" 条重复记录，点击查看</a>",{header:"友情提示",timeout:5000});
+                                $.jGrowl(model+"项有 "+bmsg+" 条重复记录，请检查是否已登记",{header:"系统提示",timeout:5000});
+                            }
+                    }
+            });}
+                if ($(".errorlist").length<1){$("#customer_add").attr("disabled",false);}
+                else {$("#customer_add").attr("disabled",true);}
+            }
+
+            $("input:lt(3)").live('blur',function(){liveCheck(this);});
+
+            $("#customer_add").click(function(){
+                //$("#add_customer_form").submit()
+                //$("#add_customer_tb tr").each(function(){str = str + "<tr>" + $(this).html() + "</tr>\n"});
+                var str ="name="+$("#id_name").val() + "&code="+$("#id_code").val() + "&telephone=" + $("#id_telephone").val() +"&address=" + $("#id_address").val() +"&joindate=" + $("#id_joindate").val() + "&note="+$("#id_note").val();
+                //str = $.toJSON($("#add_customer_form").serializeArray()),
+                $.ajax({
+                type: "POST",
+                url: ".",
+                dataType: "json",
+                //contentType : "application/x-www-form-urlencoded",
+                contentType:"text/plain",
+                data:str,
+                beforeSend: function () {
+                    $.blockUI({ message: '<h3><img src="/static/images/css/load.gif" /> 数据提交中...</h3>'});
+                    $("#customer_add").attr("disabled",true);},
+                success:function(msg) {
+                    if (msg.flag){
+                        $(window.parent.document).find("#customer_input").val(msg.name);
+                        $(window.parent.document).find("#customer_id_input").val(msg.id);
+                        //$("#add_customer_form").each(function(){this.reset(); });
+                        $.blockUI({ message: '<h3>更新完成</h3>' });
+                        parent.setTimeout("un_block()",1000);
+
+                    }
+                    else{
+                        //$("#add_customer_tb tr:lt(6)").remove();
+                        //$("#add_customer_tb tr:eq(0)").before(msg.data);
+                       for (var i=0;i<=msg.data.length-1;i++){
+                           $("#id_"+msg.data[i].key).parent().children("ul").remove();
+                           $("#id_"+msg.data[i].key).before("<ul class='errorlist'><li>"+msg.data[i].value[0]+"</li></ul>");
+                            }
+                        $.unblockUI();
+                        $("#customer_add").attr("disabled",false);
+                    }
+                    },
+                error:function(){
+                    $.blockUI({ message: '<h3>更新失败</h3>',timeout:1000 });
+
+                    $("#customer_add").attr("disabled",false);}
+                });
+                //parent.un_block();
+            });
+
+
+        })
+    </script>
+    <title>{{page_title}} | YPSI 进销存管理系统</title>
+</head>
+<body >
+<form id="add_customer_form">
+            <table class="frame_tb" id="add_customer_tb">
+                <caption><span><img src="/static/images/css/user32.png"/></span>添加客户</caption>
+                {{form.as_table}}
+                <tr><th></th><td><input type="button" id="customer_add" value="提交注册" class="m_btn" /></td></tr>
+            </table>
+</form>
+ <div id="iClose" ><img src="/static/images/css/close24.png"  style="position:absolute;top:5px; right:5px; cursor: pointer" title="关闭"/></div>
+</body>
+</html>

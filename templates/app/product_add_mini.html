@@ -1,0 +1,162 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<html>
+<head>
+    <meta http-equiv="Content-Type" content="text/html;charset=utf-8"/>
+    <link rel="shortcut icon" href="/static/images/favicon.ico"/>
+    <script type="text/javascript" src="/static/js/jquery-1.6.4.min.js"></script>
+    <script type="text/javascript" src="/static/js/jquery.blockUI.js"></script>
+    <script type="text/javascript" src="/static/js/jquery.jgrowl.min.js"></script>
+    <script type="text/javascript" src="/static/js/jquery.csrf.js"></script>
+    <link rel="stylesheet" type="text/css" href="/static/css/style.css">
+    <link rel="stylesheet" type="text/css" href="/static/css/jquery.jgrowl.css">
+
+    <script type="text/javascript">
+        $().ready(function() {
+            $("#iClose").click(function() {parent.un_block();});
+            $("#id_category").html($("#c_copy").html());
+            $("#id_hidden").closest("tr").hide();
+            $("#product_add").attr("disabled",true);
+            $("#id_category").after(" <a href='#' id='cg_link' class='blue' style='margin-left:5px;line-height:24px;'>新增类别</a>")
+            function input_err_display(obj,msg){
+                        $(obj).parent().children("ul").remove();
+                        $(obj).before("<ul class='errorlist'><li>"+msg+"</li></ul>");
+
+            }            
+            function liveCheck(obj){ //obj，最小长度，错误信息，对应model
+                var logic,mini,msg,model;
+                if ($(obj).attr("id")=="id_name"){
+                    mini = 2;
+                    logic =/^[\S]{2,30}$/;
+                    msg ="产品名称应由2-30位字符组成";
+                    model="name";
+                }
+                else if ($(obj).attr("id")=="id_barcode"){
+                    logic =/^[0-9]{4,20}$/;
+                    msg ="条形码应由4-20位数字组成";
+                    model="barcode";
+                }
+                else if ($(obj).attr("id")=="id_size"){
+                    logic =/^([1-9][0-9]{0,2})+,+([1-9][0-9]{0,2})$/;
+                    msg ="尺寸请按照 200,220 的格式输入";
+                    model="";
+                }
+                else return;
+
+
+                if ( mini ? (($(obj).val().length<mini) || !logic.test($(obj).val())) : (($(obj).val().length>0) && !logic.test($(obj).val())) ){
+                    input_err_display(obj,msg);
+                    }
+                else{$(obj).parent().children("ul").remove();}
+
+
+                var that = $(obj).closest("td");
+                if ($(obj).val().length>0 && (that.children("ul")).length<1 && model.length>0){
+                    $.ajax({
+                        type: "GET",
+                        cache: true,
+                        url: "/product/check/?model="+model+"&data="+$.trim($(obj).val()),
+                        dataType: "text",
+                        beforeSend:function(){$(obj).addClass("ac_loading");},
+                        complete: function() {$(obj).removeClass("ac_loading");} ,
+                        success: function (bmsg) {
+                            if (bmsg>0){
+                                input_err_display(obj,"已有同名产品");
+                                //that.append("<ul class='errorlist'><li></li></ul>")
+                            }
+                            else{
+                                that.children("ul").remove();
+                            }
+                    }
+            });}
+                if ($(".errorlist").length<1){$("#product_add").attr("disabled",false);}
+                else {$("#product_add").attr("disabled",true);}
+            }
+
+            $("input:lt(3)").live('blur',function(){liveCheck(this);});
+
+            $("#product_add").click(function(){
+                //$("#add_customer_form").submit()
+                //$("#add_customer_tb tr").each(function(){str = str + "<tr>" + $(this).html() + "</tr>\n"});
+                //str = $.toJSON($("#add_customer_form").serializeArray()),
+                $.ajax({
+                type: "POST",
+                url: ".",
+                dataType: "json",
+                contentType:"text/plain",
+                data:"name="+$("#id_name").val() + "&barcode="+$("#id_barcode").val() + "&size=" + $("#id_size").val() + "&category=" + $("#id_category").val() +"&note=" + $("#id_note").val(),
+                beforeSend: function () {
+                    $.blockUI({ message: '<h3><img src="/static/images/css/load.gif" /> 数据提交中...</h3>'});
+                    $("#product_add").attr("disabled",true);},
+                success:function(msg) {
+                    if (msg.flag){
+                        $(window.parent.document).find("#name_input").val(msg.name);
+                        $(window.parent.document).find("#id_input").val(msg.id);
+                        //$("#add_customer_form").each(function(){this.reset(); });
+                        $.blockUI({ message: '<h3>更新完成</h3>' });
+                        parent.setTimeout("un_block()",1000);
+
+                    }
+                    else{
+                        //$("#add_customer_tb tr:lt(6)").remove();
+                        //$("#add_customer_tb tr:eq(0)").before(msg.data);
+                       for (var i=0;i<=msg.data.length-1;i++){
+                           $("#id_"+msg.data[i].key).parent().children("ul").remove();
+                           $("#id_"+msg.data[i].key).before("<ul class='errorlist'><li>"+msg.data[i].value[0]+"</li></ul>");
+                            }
+                        $.unblockUI();
+                        $("#product_add").attr("disabled",false);
+                    }
+                    },
+                error:function(){
+                    $.blockUI({ message: '<h3>更新失败</h3>',timeout:1000 });
+
+                    $("#product_add").attr("disabled",false);}
+                });
+                //parent.un_block();
+            });
+
+    $("#cg_link").click(function(){
+            $("#category_frame").attr({src:"/category"});
+           $.blockUI({
+                message: $("#frame_child"),
+                css: {
+                    width: '200px',
+                    height: '500px',
+                    left: '400px',
+                    top: '0'
+                }
+            });
+            $(".blockOverlay").attr("title","点击返回页面").click($.unblockUI);
+        });
+
+        })
+    </script>
+    <title>{{page_title}} | YPSI 进销存管理系统</title>
+</head>
+<body >
+<form id="add_product_form">
+            <table class="frame_tb" id="add_product_tb">
+                <caption><span><img src="/static/images/css/chart32.png"/></span> 添加产品</caption>
+                {{form.as_table}}
+                <tr><th></th><td>
+                    {% regroup cc by pid as grouped %}
+                    <select id="c_copy" style="display: none">
+                    {% for group in grouped %}
+                        <optgroup label={{ group.grouper }} style=background:#e4e4e4>
+                            {% for item in group.list %}
+                            <option value="{{ item.id }}">{{ item.name }}</option>
+                            {% endfor %}
+                        </optgroup>
+                    {% endfor %}
+                    </select>
+
+                </td></tr>
+                <tr><th></th><td><input type="button" id="product_add" value="确定添加" class="m_btn" /></td></tr>
+            </table>
+</form>
+    <div id="iClose" ><img src="/static/images/css/close24.png"  style="position:absolute;top:5px; right:5px; cursor: pointer" title="关闭"/></div>
+    <div id="frame_child" style="display: none;" >
+        <iframe id="category_frame" scrolling="no"  frameborder="0" width="100%" height="100%"></iframe>
+    </div>
+</body>
+</html>

@@ -1,0 +1,184 @@
+{% extends "simple.html" %}
+{% block js-css %}
+    <script type="text/javascript" src="/static/js/jquery-1.6.4.min.js"></script>
+    <script type="text/javascript" src="/static/js/jquery-ui-1.8.16.custom.min.js"></script>
+    <script type="text/javascript" src="/static/js/jquery.blockUI.js"></script>
+    <link rel="stylesheet" type="text/css" href="/static/css/jquery-ui-1.8.16.custom.css">
+    <style type="text/css">
+        #form li{
+            margin-left: 10px;
+            line-height: 2.5em;
+            list-style-type: square;
+            *height: 35px;
+            *list-style-type: none;
+        }
+        #form label {display:inline-block;width: 100px;}
+        .elist{
+            color:red;
+            float: right;
+            margin-right: 30%;
+        }
+        button {margin-left: 155px;}
+    </style>
+
+   	<script type="text/javascript">
+       function jump(count,url) {
+            window.setTimeout(function(){
+                count--;
+                if(count > 0) {
+                    jump(count);
+                } else {location.href=url;}
+            }, 1000);
+        }
+    $().ready(function() {
+        $(".errorlist").addClass("elist");
+        $(".errorlist").removeClass("errorlist");
+        $("#id_date").datepicker({showOn: "both",constrainInput:"true"});
+        $("#id_date").datepicker('setDate', new Date().toLocaleTimeString());
+        $("#r_list tbody tr").live("mouseover",function(){
+           $(this).addClass("focus");
+        });
+        $("#r_list tbody tr").live("mouseout",function(){
+            $(this).removeClass("focus");
+        });
+    });
+	</script>
+{% endblock %}
+{% block nav %}
+        <li><a href="/">Home</a></li>
+        <li><a href="/sales/">销售管理</a></li>
+        <li class="act">库存管理</li>
+        <li><a href="/staff/">个人资料</a></li>
+        <li><a href="/customer/">会员管理</a></li>
+{% endblock %}
+{% block head-foot%}
+    <div id="head-foo">
+    <div id="head-foot">
+        <ul>
+            <li><a href ="/depots/">概览</a></li>
+            <li><a href ="#">汇款</a></li>
+            <li><a href ="/depots/in/">入库</a></li>
+            <li><a href ="/depots/out/">出库</a></li>
+            <li><a href ="/category/" target="_blank">类别管理</a></li>
+            <li><a href ="/depots/product/">产品细目</a></li>
+        </ul>
+    </div>
+    </div>
+{% endblock %}
+{% block contents %}
+    {% if level < 5 %}
+    {% ifequal act "added" %}
+        <script type="text/javascript">
+            $.blockUI({"message":"<h3>记录添加成功 1秒钟后自动跳转</h3>",timeout:1000});
+            jump(1,"?act=add");
+        </script>
+    {% else %}
+    <div style="margin-top: 40px;border: 1px solid #cccccc;border-radius: 6px;">
+    <div style="border-bottom: 1px solid #ccc;padding: 4px 10px ;background-color:#eeeeee;border-radius: 5px 5px 0 0;height: 1%;overflow:auto;">
+        {% ifequal act "list" %}
+            <div style="float: left;"><img src="/static/images/css/article_small.png" class="png"> 汇款记录列表</div>
+                    <div style="float: right;">
+                         共{{ rows }}条记录 {{ r_list.number }}/{{ r_list.paginator.num_pages }}页 
+                        <a href="?act=add" class="blue"><img src="/static/images/css/add_small2.png" class="png"> 新增汇款记录</a>
+                    </div>
+            </div>
+            <table class="table_contain" id="r_list">
+                <thead>
+                <tr>
+                    <td>编号</td><td>收款方</td><td>金额</td><td>办理人</td><td>日期</td><td>删除状态</td><td>操作</td>
+                </tr>
+                </thead>
+                {% for r in r_list.object_list %}
+                    <tr>
+                    <td>{{ forloop.counter }}</td>
+                    <td>{{ r.get_supplier_display }}</td>
+                    <td>￥ {{ r.amount }}</td>
+                    <td><a href="/staff/?id={{ r.staff_id }}" class="blue">{{ r.staff }}</a></td>
+                    <td>{{ r.date|date:"Y-m-d" }}</td>
+                    <td>
+                        {% if r.hidden %}已删除
+                        {% else %}正常
+                        {% endif %}
+                    </td>
+                    <td><a href="?act=edit&id={{ r.id }}" class="blue">修改</a></td>
+                    </tr>
+                {% endfor %}
+            </table>
+            </div>
+            <div id="pager_div">
+            <ul class="pages">
+            {% if r_list.has_previous %}
+                <li><a href="?"><img src="/static/images/css/first_small.png" class="png"/> 首页</a></li>
+                <li class="pgNext"><a href="?page={{ r_list.previous_page_number }}" ><img src="/static/images/css/previou_small.png" class="png"/> 上一页</a></li>
+            {% endif %}
+            {% for p in page_range %}
+                {% ifequal p r_list.number %}
+                    <li class="page-number pgCurrent">{{p}}</li>
+                {% else %}
+                    <li class="page-number"><a href="?page={{p}}" title="第{{p}}页" >{{p}}</a></li>
+                {% endifequal %}
+            {% endfor %}
+
+            {% if r_list.has_next %}
+                <li class="pgNext"><a href="?page={{ r_list.next_page_number }}" >下一页 <img src="/static/images/css/next_small.png" class="png"/></a></li>
+                <li><a href="?page={{ r_list.paginator.num_pages }}">末页 <img src="/static/images/css/last_small.png" class="png"/></a></li>
+            {% endif %}
+            </ul>
+            </div>
+        {% else %}
+            {% ifequal act "add" %}
+        <div style="float: left;">新增汇款记录</div>
+        <div style="float: right;">
+            <a href="?act=list" class="blue"><img src="/static/images/css/article_small.png" class="png"> 查看以往记录 </a>
+        </div>
+        </div>
+        <div>
+        <form action="?act=adding" method="POST" id="form_remit">
+        <ul id="form">
+            {{ form.as_ul }}
+        </ul>
+        <p>
+            <button type="submit" class="m_btn" ><span><img src="/static/images/css/ok_small.png" class="png"></span> 提交记录</button>
+        </p>
+        </form>
+        </div>
+            {% else %}
+                {% ifequal act "edit"%}
+            <div style="float: left;"><img src="/static/images/css/edit_small.png" class="png"> 汇款记录修改</div>
+                    <div style="float: right;">
+                        <a href="?act=list" class="blue"><img src="/static/images/css/article_small.png" class="png"> 查看以往记录</a>
+                        <a href="?act=add" class="blue"><img src="/static/images/css/add_small2.png" class="png"> 新增汇款记录</a>
+                    </div>
+            </div>
+            <div>
+            <form action="?act=edit&id={{ rId }}" method="POST">
+                <ul id="form">
+                    <li><label>记录编号 * :</label> {{ rId }}</li>
+                    {{ form.as_ul }}
+                </ul>
+                <p>
+                <button type="submit" class="m_btn" ><span><img src="/static/images/css/ok_small.png" class="png"></span> 提交修改</button>
+                </p>
+            </form>
+            </div>
+                {% else %}
+                    {% ifequal act "edited" %}
+                    <script type="text/javascript">
+                        $.blockUI({"message":"<h3>记录修改成功 1秒钟后自动跳转</h3>",timeout:1000});
+                        jump(1,"?act=list");
+                    </script>
+                    {% else %}
+                        <script type="text/javascript">
+                            $.blockUI({"message":"<h3>参数错误 返回默认页面</h3>",timeout:1000});
+                            jump(1,"?act=list");
+                        </script>
+                    {% endifequal %}
+                {% endifequal %}
+            {% endifequal %}
+        {% endifequal %}
+{% endifequal %}
+    {% else %}
+    <div style="text-align: center;margin-top: 60px;font-size: 16px">需经理以上权限</div>
+    {% endif %}
+    
+{% endblock %}

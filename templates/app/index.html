@@ -1,0 +1,142 @@
+﻿{% extends 'simple.html' %}
+{% block js-css %}
+    <script type="text/javascript" src="/static/js/jquery-1.6.4.min.js"></script>
+    <script type="text/javascript" src="/static/js/highcharts.js"></script>
+    <script type="text/javascript" src="/static/js/jquery.blockUI.js"></script>
+    <script type="text/javascript">
+    $().ready(function() {
+        var chartOptions ={
+            chart: {
+                renderTo: 'container',
+                defaultSeriesType: 'column'
+              },
+            title: {
+                text: '销量统计图',
+                style: {
+                color: '#2080DF',
+                font: "20px simhei,Verdana, sans-serif"}
+            },
+			xAxis: {categories: {{ dlist|safe }}},
+            yAxis: {
+                title: {text: '销售额 (￥)'}
+					},
+            tooltip: {
+                formatter: function() {return '<b>'+ this.series.name +'</b><br/>'+this.x +' 售:'+ this.y +'元';
+                }
+            },
+             plotOptions: {
+                 column: {
+                     stacking: 'normal',
+                     dataLabels: {
+                     enabled: false}
+                }
+
+             },
+            
+              series: {{ s_str|safe }}
+		};
+        new Highcharts.Chart(chartOptions);
+        $("#freshData").click(function(){
+
+            $("#scroll_div ul").before("<div id='loading' style='font-size:11px;margin:80px 60px '><img src='/static/images/css/load.gif' /> Loading...</div>");
+            $("#scroll_div ul").hide();
+            $.ajax({
+                type: "GET",
+                url: "?act=getData&time="+new Date().getTime() +"&"+window.location.search.replace("?",""),
+                dataType: "json",
+                timeout:10000,
+                success:function(msg){
+                    $("#scroll_ul li").remove();
+                    var flag = 1;
+                    $(msg.plist).each(function(){
+                        $("#scroll_ul").append("<li>"+flag+". <a href='#' class='blue' title='公告内容: '"+this.note+">公告：" +this.title+ " ["+this.date+"]</a><hr></li>");
+                        flag++;
+                    });
+                    $(msg.slist).each(function(){
+                        $("#scroll_ul").append("<li>"+flag+".  <a href='/sales/show/?sid="+this.sid+"' class='blue'>"+this.shop+ " "+ this.staff + " 售" + this.amount +"元</br> [" + this.date+"]</a><hr></li>")
+                        flag++;
+                    });
+                   chartOptions.series=eval(msg.s_str);
+                   chartOptions.xAxis.categories = msg.dlist;
+                   new Highcharts.Chart(chartOptions);
+                    $("#loading").remove();
+                    $("#scroll_div ul").fadeIn("slow");
+                    },
+                    error:function(){
+                        $("#scroll_div").block({ message: '<h3>读取错误</h3>',timeout:1500});
+                        $("#loading").remove();
+                        $("#scroll_div ul").fadeIn("slow");
+
+                    }
+            });
+        });
+
+
+
+        $(function(){
+            var _wrap=$("#scroll_ul");//定义滚动区域
+            var _interval=4000;//定义滚动间隙时间
+            var _moving;//需要清除的动画
+            _wrap.hover(function(){clearInterval(_moving);},//当鼠标在滚动区域中时,停止滚动
+                        function(){
+                            _moving=setInterval(function(){
+                            var _field=_wrap.find('li:first');//此变量不可放置于函数起始处,li:first取值是变化的
+                            var _h=_field.height();//取得每次滚动高度
+                            _field.animate({marginTop:-_h+'px'},600,function(){//通过取负margin值,隐藏第一行
+                            _field.css('marginTop',0).appendTo(_wrap);//隐藏后,将该行的margin值置零,并插入到最后,实现无缝滚动
+                        })
+                    },_interval)//滚动间隔时间取决于_interval
+                }).trigger('mouseleave');//函数载入时,模拟执行mouseleave,即自动滚动
+            });
+    });
+		</script>
+    <style>
+ul.mulitline{height:180px;overflow:hidden;list-style:outside none;width: 216px;position:relative;padding:0;margin:0}
+
+</style>
+{% endblock %}
+{% block nav %}
+        <li class="act">Home</li>
+        <li><a href="/sales/">销售管理</a></li>
+        <li><a href="/depots/">库存管理</a></li>
+        <li><a href="/staff/">个人资料</a></li>
+        <li><a href="/customer/">会员管理</a></li>
+{% endblock %}
+{% block contents %}
+    <div id="p-left" >
+    {% if s_str == "[]" %}
+        <div>尚无销售数据</div>
+    {% else %}
+        <div id="container" style="width: 100%; height: 400px; margin: 0 auto"></div>
+    {% endif %}
+    </div>
+    <div style="float:right;width:241px;">
+        <div align="center" style="background:#e4e4e4;padding: 6px">
+            <div style="background : #fafafa;padding: 4px 0;border: 1px solid #ccc">
+                当前用户：<a href="/staff/" class="blue">{{ request.user.get_profile }}</a>&nbsp;&nbsp;&nbsp;<a href="/accounts/login/?act=logout" class="blue">注销</a>
+                </br>上次登录：{{ request.user.last_login|date:"Y-m-d h:m" }}
+            </div>
+            <div style="margin-top : 6px;" align="center">
+                <a href="?days=7" class="blue">7日销售</a>&nbsp;&nbsp;&nbsp;
+                <a href="?days=30" class="blue">30日销售</a>&nbsp;&nbsp;&nbsp;
+                <a href="/sales/show/" class="blue"><span><img src="/static/images/css/chart16.png" class=" png"/> 更多</span></a>
+            </div>
+        </div>
+
+        <div style="background:#e4e4e4;padding: 6px;margin-top: 20px;">
+            <div id="scroll_div" style="background : #fafafa;padding: 5px;height: 192px;border: 1px solid #ccc">
+            <ul class="mulitline" id="scroll_ul">
+               {% for p in plist %}
+                <li><a href="#" title="公告内容: {{ p.note }}" class="blue">公告：{{ p.title }} [{{ p.date|date:"Y-m-d" }}]</a><hr></li>
+               {% endfor %}
+               {% for s in slist %}
+                <li>{{ forloop.counter }}. <a href="/sales/show/?sid={{ s.id }}" class="blue">{{ s }}</a><hr></li>
+               {% endfor %}
+            </ul>
+            </div>
+            <div style="margin-top : 6px;margin-left: 6px;"  >
+                各店最近10条销售记录 <a href="javascript:void(0)" class="blue" id="freshData"><span><img src="/static/images/css/refresh_small.png" /> 刷新</span></a>
+            </div>
+        </div>
+    </div>
+{% endblock %}
