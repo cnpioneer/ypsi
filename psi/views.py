@@ -8,6 +8,7 @@ from django.contrib.auth.models import User
 import time,datetime
 from psi import yforms
 import re,csv
+from settings import MEDIA_ROOT
 
 from yforms import YLogin
 from psi.models import SellOrder,Shop,Depot,Products,Customer, Staff, SellOrderDetail,Remit,InStream,InDetail,OutStream,OutDetail, Category,Posts
@@ -348,7 +349,8 @@ def ypsi_sales_search(request):
                     #if oStr["type"] is "explort":
                     i = 1
                     d_total = 0
-                    csvfile = open('static/csv/result%s.csv'%request.user.get_profile().shop_id,'wb')
+
+                    csvfile = open('%s/csv/result%s.csv'%(MEDIA_ROOT,request.user.get_profile().shop_id),'wb')
                     '''
                     with open('static/csv/result%s.csv'%request.user.get_profile().shop_id, 'wb') as csvfile:
                         spamwriter = csv.writer(csvfile)
