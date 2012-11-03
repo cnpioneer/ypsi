@@ -1,4 +1,5 @@
 # -*- coding: UTF-8 -*-
+import codecs
 import json
 from django.contrib.auth import authenticate, login, logout
 from django.http import HttpResponseRedirect, HttpResponse
@@ -6,7 +7,7 @@ from django.shortcuts import render_to_response, get_object_or_404
 from django.contrib.auth.models import User
 import time,datetime
 from psi import yforms
-import re
+import re,csv
 
 from yforms import YLogin
 from psi.models import SellOrder,Shop,Depot,Products,Customer, Staff, SellOrderDetail,Remit,InStream,InDetail,OutStream,OutDetail, Category,Posts
@@ -244,7 +245,6 @@ def ypsi_sales_search(request):
         oStr = eval(request.raw_post_data)
         #shopId = get_object_or_404(Shop, id=request.user.get_profile().shop_id)
         #print oStr
-
         if oStr["type"] is "all":
             oQ = SellOrder.objects.all().order_by('-id')
         else:
@@ -332,7 +332,6 @@ def ypsi_sales_search(request):
         if len(eArr)<1:
             rows = len(oQ)
             t_total = 0
-
             if rows>0:
                 if oStr["type"] is "simple":
                     oQ = SellOrder.objects.filter(shop=get_object_or_404(Shop, id=request.user.get_profile().shop_id)).order_by('-id')[:oStr["count"]]
@@ -346,8 +345,28 @@ def ypsi_sales_search(request):
                     rows = len(oQ)
                     
                 else:
+                    #if oStr["type"] is "explort":
+                    i = 1
+                    d_total = 0
+                    csvfile = open('static/csv/result%s.csv'%request.user.get_profile().shop_id,'wb')
+                    '''
+                    with open('static/csv/result%s.csv'%request.user.get_profile().shop_id, 'wb') as csvfile:
+                        spamwriter = csv.writer(csvfile)
+                        spamwriter.write('\xEF\xBB\xBF')
+                        spamwriter.writerow(["NO.","日期","产品名称","类别","价格","数量","小计"])
+                    '''
+                    csvfile.write(codecs.BOM_UTF8)
+                    w = csv.writer(csvfile)
+                    w.writerow(["编号","日期","产品名称","类别","价格","数量","小计"])
                     for o in oQ:
-                        t_total = t_total + o.total
+                        odQ = SellOrderDetail.objects.filter(oid=o.id)
+                        for od in odQ:
+                            w.writerow([i, o.date, od.product.name.encode('utf8'),od.product.category.name.encode('utf8'),od.price,od.quantity,od.price*od.quantity])
+                            i += 1
+                        t_total += o.total
+                        d_total += o.discount
+                    w.writerow(["","","","折扣总额",d_total,"实收",t_total])
+                    csvfile.close()
                     mP = (int(oStr["page"])-1)*20
                     oQ = oQ[mP:mP+20]
                     flag = True
@@ -365,6 +384,15 @@ def ypsi_sales_search(request):
         return render_to_response("app/sales_show.html",{"page_title":"订单详情"})
     return HttpResponse(simplejson.dumps({"flag":flag,"rows":rows,"data":eArr,"oStr":oStr,"t_total":t_total},ensure_ascii=False), mimetype="text/plain")
 
+'''
+def ypsi_sales_explort(request):
+    response = HttpResponse(mimetype='text/csv')
+    response['Content-Disposition'] = 'attachment; filename="somefilename.csv"'
+    writer = csv.writer(response)
+    writer.writerow(['First row', 'Foo', 'Bar', 'Baz'])
+    writer.writerow(['Second row', 'A', 'B', 'C', '"Testing"', "Here's a quote"])
+    return response
+'''
 
 def ypsi_sales_add(request):
     if request.method == "POST":
@@ -495,7 +523,7 @@ def ypsi_sales_show(request):
     if len(qStr)<1:
         page_title = "订单修改"
         #shopId = get_object_or_404(Shop, id=request.user.get_profile().shop_id)
-        return render_to_response('app/sales_show.html',{"page_title":page_title})
+        return render_to_response('app/sales_show.html',{"page_title":page_title,"shop_id":request.user.get_profile().shop.id})
     else:
         flag = True
         data = []

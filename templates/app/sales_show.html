@@ -118,13 +118,13 @@
             });
         });
 
-
-
     function postSearch(reload,type,count){
             var postData;
+
             if (type == "simple" || type == "exact"){
                 postData="{'type':'"+type+"','page':'"+thePage+"','count':'"+count+"'}"
             }
+
             else{
                 postData = "{'type':'"+type+"','page':'"+thePage+"','code':'"+ $("#code_input").val() +"','staff':'"+$("#staff_id_input").val()+"','customer':'"+ $("#customer_id_input").val()+"','sDate':'"+$("#date_start_input").val()+
                            "','eDate':'"+$("#date_end_input").val()+"','note':'"+$("#note_input").val()+"','hidden':'"+$("#hidden_input").is(":checked")+"'}";
@@ -141,7 +141,7 @@
                                 //$.blockUI({ message: '<h3><img src="/static/images/css/load.gif" /> 结果获取中（提醒：系统只回溯3个月内的订单）...</h3>'});
                             },
                             success:function(msg){
-                                if (msg.rows > 0){$("#explort_csv").show();}
+                                if (msg.rows > 0 && type == "normal"){$("#explort_csv").show();}
                                 else {$("#explort_csv").hide();}
                                 if (msg.flag){
                                     //console.log(msg.data)
@@ -207,7 +207,7 @@
              }
 
          }
-         
+
     $("#order_search_btn").click(function(){
         /^[A-Za-z0-9]{0,20}$/.test($("#code_input").val()) || showErr("订单编号由4-20位数字及字母组成",true);
         var regDate = /(([0-9]{3}[1-9]|[0-9]{2}[1-9][0-9]{1}|[0-9]{1}[1-9][0-9]{2}|[1-9][0-9]{3})-(((0[13578]|1[02])-(0[1-9]|[12][0-9]|3[01]))|((0[469]|11)-(0[1-9]|[12][0-9]|30))|(02-(0[1-9]|[1][0-9]|2[0-8]))))|((([0-9]{2})(0[48]|[2468][048]|[13579][26])|((0[48]|[2468][048]|[3579][26])00))-02-29)/;
@@ -223,12 +223,13 @@
             showErr("为避免数据量过大，系统只回溯3个月内的订单",true);
         }
     }
-
             //(($("#money_less_input").val().length<1 || (/^[0-9]+(.[0-9]{2}|.[0-9]{1})?$/.test($("#money_less_input").val()))) && ($("#money_more_input").val().length<1 || /^[0-9]+(.[0-9]{2}|.[0-9]{1})?$/.test($("#money_more_input").val()))) || showErr("价格应为整数或最多两位小数的数字",true);
             if (!flag){
-                postSearch(true,"normal",0);
+                if (this.id == "explort_csv"){postSearch(true,"explort",0)}
+                else {postSearch(true,"normal",0);}
             }
         })
+
          
      })
     </script>
@@ -270,7 +271,7 @@
         <input type="text" id="note_input" class="ac_input" style="width:266px" />
         <label for="hidden_input">已删</label>
         <input type="checkbox" id="hidden_input"  class="ac_input"  style="cursor: default"/>
-        <button type="submit" id="order_search_btn" class="m_btn"><img src="/static/images/css/search_small.png" class=" png"> 检索 </button> <a id="explort_csv" href="" class="blue">导出报表</a></p>
+        <button type="submit" id="order_search_btn" class="m_btn"><img src="/static/images/css/search_small.png" class=" png"> 检索 </button> <a id="explort_csv" href="/static/csv/result{{  shop_id }}.csv" class="blue">报表下载</a></p>
     </div>
     <div id="frame_pa" style="display: none;" >
         <iframe id='sale_edit_frame' scrolling='auto' src='' frameborder='0' width="100%" height="100%"></iframe>
