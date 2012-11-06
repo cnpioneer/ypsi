@@ -169,7 +169,9 @@
         <input type="text" id="pid" style="display: none"/>
         <label for="in_or_out" style="margin-left: 20px">选择入库 / 出库</label>
             <select id="in_or_out">
+                {% if level < 5%}
                 <option value="1">入库记录</option>
+                {% endif %}
                 <option value="2">出库记录</option>
             </select>
         <label for="depot_id" style="margin-left: 20px"> 选择仓库</label>
