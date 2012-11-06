@@ -88,16 +88,17 @@
           }]
        };
 
-        function showChart(name,div,type,chartype){
+        function showChart(name,div,type,chartype,shop){
+            console.log(shop);
+            console.log($("#shop_id").val());
            $("#show_btn").attr("name")==undefined ||
            $.ajax({
            type: "GET",
-           url: "/depots/charts/?type="+type+"&id="+$("#show_btn").attr("name"),
+           url: "/depots/charts/?type="+type+"&shop="+shop+"&id="+$("#show_btn").attr("name"),
            dataType: "json",
            timeout:10000,
            success:function(msg){
                if (msg.ttq>0){
-
                    chartOptions.series[0].data=msg.data;
                    chartOptions.series[0].type=chartype;
                    chartOptions.chart.renderTo=div;
@@ -115,9 +116,9 @@
            });
         }
         $("#search_btn").attr("disabled",true);
-        showChart("仓库分布一览","c1","pdp","pie");
-        showChart("各店分布一览","c2","psp","pie");
-        showChart("历史销售一览","c3","pssp","spline");
+        showChart("仓库分布一览","c1","pdp","pie",0);
+        showChart("各店分布一览","c2","psp","pie",0);
+        showChart("历史销售一览","c3","pssp","spline",{{ sid }});
     });
 	</script>
 {% endblock %}
@@ -146,10 +147,15 @@
     <form id="fm" method="GET" action="/depots/product">
         <div style="text-align: center;margin-top: 40px;*margin-top:20px;">
                 <label for="name_input">产品名称 / 条形码：</label>
-                <input type="text" id="name_input" class="ac_input png" style="width: 280px;"/>
-                <input type="text" id="id_input" name="id" style="display: none"/>
-                <button type="submit" id="search_btn" class="m_btn"><img src="/static/images/css/search_small.png" class=" png"> 产品细目获取 </button>
-                <span >[ 因产品数量较多，为效率考虑请至少输入两个关键字符 ]</span>
+                <input type="text" id="name_input" class="ac_input png" style="width: 200px;"/>
+                <input type="text" id="id_input" name="pid" style="display: none"/>
+                <label for="shop_id">店铺销售记录</label>
+                <select id="shop_id" name="sid">
+                    <option value="0">所有</option>
+                    {% for s in s_list %}<option value="{{ s.id }}" >{{ s.name }}</option>{% endfor %}
+                </select>
+                <button type="submit" id="search_btn" class="m_btn" ><img src="/static/images/css/search_small.png" class=" png"> 产品细目获取 </button>
+                <span >[ 请至少输入两个关键字符 ]</span>
         </div>
     </form>
     {% if pd %}

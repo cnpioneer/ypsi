@@ -647,6 +647,7 @@ def ypsi_depots(request):
 def ypsi_depots_charts(request):
     qStr = request.GET.get("type","")
     pid = request.GET.get("id","")
+    sid = request.GET.get("shop","")
     if qStr:
         cursor = connection.cursor()
         if qStr == "depots":
@@ -666,7 +667,12 @@ def ypsi_depots_charts(request):
                            "(select psi_sellorder.shop_id as ssid, sum(ifnull(quantity,0)) as stq from psi_sellorderdetail,psi_sellorder where product_id=%s and psi_sellorder.hidden=0 and oid_id=psi_sellorder.id  group by psi_sellorder.shop_id) "
                            "on psi_outstream.shop_id=ssid where  psi_outdetail.product_id=%s and psi_outstream.hidden=0 and outid_id = psi_outstream.id and psi_outstream.shop_id=psi_shop.id group by psi_outstream.shop_id",[pid,pid])
         elif qStr == "pssp" and pid:
-            cursor.execute("select date(date) as sdate,sum(quantity) from psi_sellorder,psi_sellorderdetail where psi_sellorder.id = psi_sellorderdetail.oid_id and product_id=%s and hidden=0 group by sdate",[pid])
+            if sid == "0":
+                print "all"
+                cursor.execute("select date(date) as sdate,sum(quantity) from psi_sellorder,psi_sellorderdetail where psi_sellorder.id = psi_sellorderdetail.oid_id and product_id=%s and hidden=0 group by sdate",[pid])
+            else:
+                print sid
+                cursor.execute("select date(date) as sdate,sum(quantity) from psi_sellorder,psi_sellorderdetail where psi_sellorder.shop_id=%s and psi_sellorder.id = psi_sellorderdetail.oid_id and product_id=%s and hidden=0 group by sdate",[sid,pid])
         r_str = cursor.fetchall()
         cursor.close()
         data = []
@@ -681,13 +687,20 @@ def ypsi_depots_charts(request):
 
 def ypsi_depots_product(request):
     page_title = "产品细目查询"
-    pid = request.GET.get("id","")
+    pid = request.GET.get("pid","")
+    sid = request.GET.get("sid","0")
+    s_list = Shop.objects.exclude(name="总部").only("id","name")
     if pid:
         pd = Products.objects.get(id=pid)
-        tq = SellOrderDetail.objects.filter(product=pd,oid__in=SellOrder.objects.filter(hidden=0).only(id)).aggregate(Sum('quantity'))['quantity__sum']
-        return render_to_response('app/depots_product.html',{"page_title":page_title,"level":request.user.get_profile().level,"pd":pd,"tq":tq})
+        if sid == "0":
+            tq = SellOrderDetail.objects.filter(product=pd,oid__in=SellOrder.objects.filter(hidden=0).only(id)).aggregate(Sum('quantity'))['quantity__sum']
+        else:
+            tq = SellOrderDetail.objects.filter(product=pd,oid__in=SellOrder.objects.filter(hidden=0,shop=get_object_or_404(Shop, id=sid)).only(id)).aggregate(Sum('quantity'))['quantity__sum']
+        if tq is None:
+            tq = 0
+        return render_to_response('app/depots_product.html',{"page_title":page_title,"s_list":s_list,"sid":sid,"level":request.user.get_profile().level,"pd":pd,"tq":tq})
     else:
-        return render_to_response('app/depots_product.html',{"page_title":page_title,"level":request.user.get_profile().level})
+        return render_to_response('app/depots_product.html',{"page_title":page_title,"s_list":s_list,"sid":0,"level":request.user.get_profile().level})
 
 
 def ypsi_depots_in(request):
