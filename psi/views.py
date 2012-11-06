@@ -346,17 +346,9 @@ def ypsi_sales_search(request):
                     rows = len(oQ)
                     
                 else:
-                    #if oStr["type"] is "explort":
                     i = 1
                     d_total = 0
-
-                    csvfile = open('%scsv/result%s.csv'%(MEDIA_ROOT,request.user.get_profile().shop_id),'wb')
-                    '''
-                    with open('static/csv/result%s.csv'%request.user.get_profile().shop_id, 'wb') as csvfile:
-                        spamwriter = csv.writer(csvfile)
-                        spamwriter.write('\xEF\xBB\xBF')
-                        spamwriter.writerow(["NO.","日期","产品名称","类别","价格","数量","小计"])
-                    '''
+                    csvfile = open('%s/csv/result%s.csv'%(MEDIA_ROOT,request.user.get_profile().shop_id),'wb')
                     csvfile.write(codecs.BOM_UTF8)
                     w = csv.writer(csvfile)
                     w.writerow(["编号","日期","产品名称","类别","价格","数量","小计"])
