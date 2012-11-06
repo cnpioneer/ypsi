@@ -838,7 +838,7 @@ def ypsi_depots_in(request):
                     inds = InDetail.objects.filter(product=pid,quantity__gt=0).values_list("inid")
                 else:
                     inds = InDetail.objects.filter(product=pid,quantity__gt=0,depot=did).values_list("inid")
-                ins = InStream.objects.filter(id__in=inds,hidden=0).order_by("-id")
+                ins = InStream.objects.filter(id__in=inds).order_by("-id")
                 slist = InDetail.objects.filter(inid__in=ins,quantity__gt=0,product=pid).values("inid","product").annotate(tq=Sum("quantity"))
                 for (i,q) in zip(ins,slist):
                     i.pq = q["tq"]
@@ -993,7 +993,7 @@ def ypsi_depots_out(request):
                     outds = OutDetail.objects.filter(product=pid,quantity__gt=0).values_list("outid")
                 else:
                     outds = OutDetail.objects.filter(product=pid,quantity__gt=0,depot=did).values_list("outid")
-                out = OutStream.objects.filter(id__in=outds,hidden=0).order_by("-id")
+                out = OutStream.objects.filter(id__in=outds).order_by("-id")
                 slist = OutDetail.objects.filter(outid__in=out,quantity__gt=0,product=oId).values("outid","product").annotate(tq=Sum("quantity"))
                 for (o,q) in zip(out,slist):
                     o.pq = q["tq"]
