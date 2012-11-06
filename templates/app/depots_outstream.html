@@ -440,7 +440,11 @@
                 {% if outstream %}
                     {{ outstream.code }} 经办人：{{ outstream.keeper }}、{{ outstream.staff1 }} [{{ outstream.date|date:"Y-m-d" }}]
                 {% else %}
-                <img src="/static/images/css/left_small.png" class="png"> 出库提要列表
+                <img src="/static/images/css/left_small.png" class="png">
+                    {% if pname %}
+                        {{ pname }}
+                    {% endif %}
+                    出库提要列表
                 {% endif %}
             </div>
             <div style="float: right;">共{{ rows }}条记录 {{ out_list.number }}/{{ out_list.paginator.num_pages }}页
@@ -500,7 +504,7 @@
                     <td>{{ forloop.counter }}</td>
                     <td><a href="?act=detail&id={{ i.id }}" class="blue">{{ i.code }}</a></td>
                     <td>{{ i.shop }}</td>
-                    <td>{{ i.total.0 }}件{% if level < 5 %} / ￥{{ i.total.1 }}{% endif %}</td>
+                    <td>{% if i.pq %}{{ i.pq }}件: {% endif %}{{ i.total.0 }}件{% if level < 5 %} / ￥{{ i.total.1 }}{% endif %}</td>
                     <td><a href="/staff/?id={{ i.keeper_id }}" class="blue">{{ i.keeper.name }}</a></td>
                     <td><a href="/staff/?id={{ i.staff1_id }}" class="blue">{{ i.staff1 }}</a>
                     </td>

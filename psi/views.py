@@ -350,7 +350,7 @@ def ypsi_sales_search(request):
                     i = 1
                     d_total = 0
 
-                    csvfile = open('%s/csv/result%s.csv'%(MEDIA_ROOT,request.user.get_profile().shop_id),'wb')
+                    csvfile = open('%scsv/result%s.csv'%(MEDIA_ROOT,request.user.get_profile().shop_id),'wb')
                     '''
                     with open('static/csv/result%s.csv'%request.user.get_profile().shop_id, 'wb') as csvfile:
                         spamwriter = csv.writer(csvfile)
@@ -870,7 +870,7 @@ def ypsi_depots_out(request):
     oId = request.GET.get("id","")
     level = request.user.get_profile().level
     page_title = "出库单列表"
-
+    pname = ""
     if act == "add":
         page_title = "新增出库提要信息"
         if request.POST:
@@ -989,12 +989,17 @@ def ypsi_depots_out(request):
         else:
             if act == "search":
                 pid = get_object_or_404(Products, id=oId)
-                did=request.GET.get("did","0")
+                pname = pid.name
+                print pname
+                did = request.GET.get("did","0")
                 if did == "0":
-                    outds = OutDetail.objects.filter(product=pid).values_list("outid")
+                    outds = OutDetail.objects.filter(product=pid,quantity__gt=0).values_list("outid")
                 else:
-                    outds = OutDetail.objects.filter(product=pid,depot=did).values_list("outid")
+                    outds = OutDetail.objects.filter(product=pid,quantity__gt=0,depot=did).values_list("outid")
                 out = OutStream.objects.filter(id__in=outds,hidden=0).order_by("-id")
+                tql = OutDetail.objects.filter(outid__in=out,quantity__gt=0,product=oId).values("outid","product").annotate(tq=Sum("quantity"))
+                for (o,q) in zip(out,tql):
+                    o.pq = q["tq"]
                 url = "act=search&id=%s&did=%s&"%(oId,did)
             else:
                 out = OutStream.objects.order_by("-id")
@@ -1012,7 +1017,7 @@ def ypsi_depots_out(request):
             page_range = paginator.page_range[page-after_range_num:page+befor_range_num]
         else:
             page_range = paginator.page_range[0:int(page)+befor_range_num]
-        return render_to_response('app/depots_outstream.html',{"page_title":page_title,"out_list":out_list,"page_range":page_range,"rows":len(out),"outstream":outstream,"level":level,"url":url})
+        return render_to_response('app/depots_outstream.html',{"page_title":page_title,"out_list":out_list,"page_range":page_range,"rows":len(out),"outstream":outstream,"level":level,"url":url,"pname":pname})
 
 def ypsi_depots_remit(request):
     act = request.GET.get("act","list")
