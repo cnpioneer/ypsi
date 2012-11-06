@@ -387,7 +387,11 @@
                 {% if instream %}
                     {{ instream.code }} 经办人：{{ instream.keeper }}、{{ instream.staff1 }} [{{ instream.date|date:"Y-m-d" }}]
                 {% else %}
-                <img src="/static/images/css/right_small.png" class="png"> 入库提要列表
+                <img src="/static/images/css/right_small.png" class="png">
+                    {% if pname %}
+                        {{ pname }}
+                    {% endif %}
+                    入库提要列表
                 {% endif %}
 
             </div>
@@ -446,7 +450,11 @@
                     <td>{{ forloop.counter }}</td>
                     <td><a href="?act=detail&id={{ i.id }}" class="blue">{{ i.code }}</a></td>
                     <td>{{ i.get_supplier_display }}</td>
-                    <td>{{ i.i_str.0 }}种 / {{ i.i_str.1 }}件 / ￥{{ i.i_str.2 }}</td>
+                    <td>{% if i.pq %}
+                        {{ i.pq }}件: {{ i.i_str.1 }}件
+                        {% else %}
+                        {{ i.i_str.0 }}种 / {{ i.i_str.1 }}件 / ￥{{ i.i_str.2 }}
+                    {% endif %}</td>
                     <td><a href="/staff/?id={{ i.keeper_id }}" class="blue">{{ i.keeper.name }}</a></td>
                     <td><a href="/staff/?id={{ i.staff1_id }}" class="blue">{{ i.staff1 }}</a>
                         {% if i.staff2 %}

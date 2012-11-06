@@ -706,6 +706,7 @@ def ypsi_depots_product(request):
 def ypsi_depots_in(request):
     act = request.GET.get("act","list")
     iId = request.GET.get("id","")
+    pname = ""
     level = request.user.get_profile().level
     page_title = "入库单列表"
     if act == "add":
@@ -839,12 +840,16 @@ def ypsi_depots_in(request):
         else:
             if act == "search":
                 pid = get_object_or_404(Products, id=iId)
+                pname = pid.name
                 did=request.GET.get("did","0")
                 if did == "0":
-                    inds = InDetail.objects.filter(product=pid).values_list("inid")
+                    inds = InDetail.objects.filter(product=pid,quantity__gt=0).values_list("inid")
                 else:
-                    inds = InDetail.objects.filter(product=pid,depot=did).values_list("inid")
+                    inds = InDetail.objects.filter(product=pid,quantity__gt=0,depot=did).values_list("inid")
                 ins = InStream.objects.filter(id__in=inds,hidden=0).order_by("-id")
+                slist = InDetail.objects.filter(inid__in=ins,quantity__gt=0,product=pid).values("inid","product").annotate(tq=Sum("quantity"))
+                for (i,q) in zip(ins,slist):
+                    i.pq = q["tq"]
                 url = "act=search&id=%s&did=%s&"%(iId,did)
             else:
                 ins = InStream.objects.order_by("-id")
@@ -863,7 +868,7 @@ def ypsi_depots_in(request):
         else:
             page_range = paginator.page_range[0:int(page)+befor_range_num]
 
-        return render_to_response('app/depots_instream.html',{"page_title":page_title,"ins_list":ins_list,"page_range":page_range,"rows":len(ins),"instream":instream,"level":level,"url":url})
+        return render_to_response('app/depots_instream.html',{"page_title":page_title,"ins_list":ins_list,"page_range":page_range,"rows":len(ins),"instream":instream,"level":level,"url":url,"pname":pname})
 
 def ypsi_depots_out(request):
     act = request.GET.get("act","list")
@@ -997,8 +1002,8 @@ def ypsi_depots_out(request):
                 else:
                     outds = OutDetail.objects.filter(product=pid,quantity__gt=0,depot=did).values_list("outid")
                 out = OutStream.objects.filter(id__in=outds,hidden=0).order_by("-id")
-                tql = OutDetail.objects.filter(outid__in=out,quantity__gt=0,product=oId).values("outid","product").annotate(tq=Sum("quantity"))
-                for (o,q) in zip(out,tql):
+                slist = OutDetail.objects.filter(outid__in=out,quantity__gt=0,product=oId).values("outid","product").annotate(tq=Sum("quantity"))
+                for (o,q) in zip(out,slist):
                     o.pq = q["tq"]
                 url = "act=search&id=%s&did=%s&"%(oId,did)
             else:
