@@ -839,7 +839,7 @@ def ypsi_depots_in(request):
                 else:
                     inds = InDetail.objects.filter(product=pid,quantity__gt=0,depot=did).values_list("inid")
                 ins = InStream.objects.filter(id__in=inds).order_by("-id")
-                slist = InDetail.objects.filter(inid__in=ins,quantity__gt=0,product=pid).values("inid","product").annotate(tq=Sum("quantity"))
+                slist = InDetail.objects.filter(inid__in=ins,quantity__gt=0,product=pid).values("inid","product").annotate(tq=Sum("quantity")).order_by("-inid")
                 for (i,q) in zip(ins,slist):
                     i.pq = q["tq"]
                 url = "act=search&id=%s&did=%s&"%(iId,did)
@@ -987,14 +987,13 @@ def ypsi_depots_out(request):
             if act == "search":
                 pid = get_object_or_404(Products, id=oId)
                 pname = pid.name
-                print pname
                 did = request.GET.get("did","0")
                 if did == "0":
                     outds = OutDetail.objects.filter(product=pid,quantity__gt=0).values_list("outid")
                 else:
                     outds = OutDetail.objects.filter(product=pid,quantity__gt=0,depot=did).values_list("outid")
                 out = OutStream.objects.filter(id__in=outds).order_by("-id")
-                slist = OutDetail.objects.filter(outid__in=out,quantity__gt=0,product=oId).values("outid","product").annotate(tq=Sum("quantity"))
+                slist = OutDetail.objects.filter(outid__in=out,quantity__gt=0,product=oId).values("outid","product").annotate(tq=Sum("quantity")).order_by("-outid")
                 for (o,q) in zip(out,slist):
                     o.pq = q["tq"]
                 url = "act=search&id=%s&did=%s&"%(oId,did)
