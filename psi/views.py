@@ -325,7 +325,6 @@ def ypsi_sales_search(request):
             if len(eArr)<1 and len(oStr["sDate"])>0 and len(oStr["eDate"])>0:
                 if time.strptime(oStr["eDate"], "%Y-%m-%d")<time.strptime(oStr["sDate"], "%Y-%m-%d"):
                     eArr.append("起始时间不能够大于结束时间")
-
                 #print eArr
                 #print connection.queries
                 #time.sleep(3)
@@ -351,15 +350,15 @@ def ypsi_sales_search(request):
                     csvfile = open('%s/csv/result%s.csv'%(MEDIA_ROOT,request.user.get_profile().shop_id),'wb')
                     csvfile.write(codecs.BOM_UTF8)
                     w = csv.writer(csvfile)
-                    w.writerow(["编号","日期","产品名称","类别","价格","数量","小计"])
-                    for o in oQ:
+                    w.writerow(["编号","日期","产品名称","尺寸","类别","价格","数量","小计"])
+                    for o in oQ.order_by("date"):
                         odQ = SellOrderDetail.objects.filter(oid=o.id)
                         for od in odQ:
-                            w.writerow([i, o.date, od.product.name.encode('utf8'),od.product.category.name.encode('utf8'),od.price,od.quantity,od.price*od.quantity])
+                            w.writerow([i, o.date, od.product.name.encode('utf8'),od.product.size,od.product.category.name.encode('utf8'),od.price,od.quantity,od.price*od.quantity])
                             i += 1
                         t_total += o.total
                         d_total += o.discount
-                    w.writerow(["","","","折扣总额",d_total,"实收",t_total])
+                    w.writerow(["","","","","折扣总额",d_total,"实收",t_total])
                     csvfile.close()
                     mP = (int(oStr["page"])-1)*20
                     oQ = oQ[mP:mP+20]
