@@ -398,6 +398,7 @@
 {% block contents %}
 
     {% if outstream %}
+        {% if level < 5 %}
         <div style="padding: 15px 0 0 0">
             <label for="name_input">产品：</label><input type="text" id="name_input" class="ac_input" maxlength="20" style="width:240px" title="请最少输入两个关键字符便于查找"/>
             <input type="text" id="id_input" style="display: none"/>
@@ -408,6 +409,7 @@
             <input type="text" id="did_input" style="display: none"/>
             <button  id="add_btn" class="m_btn"><span><img src="/static/images/css/ok_small.png" class=" png"></span> 确定添加</button>
         </div>
+        {% endif %}
 
     {% endif %}
     <div style="margin-top: 30px;border: 1px solid #cccccc;border-radius: 6px;">

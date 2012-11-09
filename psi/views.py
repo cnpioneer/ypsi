@@ -243,14 +243,19 @@ def ypsi_sales_search(request):
         flag = False
         eArr = []
         rows = 0
+        t_total = 0
         oStr = eval(request.raw_post_data)
-        #shopId = get_object_or_404(Shop, id=request.user.get_profile().shop_id)
-        #print oStr
-        if oStr["type"] is "all":
+        level = request.user.get_profile().level
+        if oStr["shop"]  == "0": #shop_input优先传递shop筛选值
+            ShopId = "0"
+        elif oStr["shop"]:
+            ShopId = get_object_or_404(Shop, id=oStr["shop"])
+        else:
+            ShopId = get_object_or_404(Shop, id=request.user.get_profile().shop_id)
+        if oStr["type"] is "all" or ShopId == "0":
             oQ = SellOrder.objects.all().order_by('-id')
         else:
-            oQ = SellOrder.objects.filter(shop=get_object_or_404(Shop, id=request.user.get_profile().shop_id)).order_by('-id')
-
+            oQ = SellOrder.objects.filter(shop=ShopId).order_by('-id')
 
         if oStr["type"] is "simple" or oStr["type"] is "exact":
             flag = True
@@ -331,10 +336,12 @@ def ypsi_sales_search(request):
 
         if len(eArr)<1:
             rows = len(oQ)
-            t_total = 0
             if rows>0:
                 if oStr["type"] is "simple":
-                    oQ = SellOrder.objects.filter(shop=get_object_or_404(Shop, id=request.user.get_profile().shop_id)).order_by('-id')[:oStr["count"]]
+                    if ShopId == "0":
+                        oQ = SellOrder.objects.all().order_by('-id')[:oStr["count"]]
+                    else:
+                        oQ = SellOrder.objects.filter(shop=ShopId).order_by('-id')[:oStr["count"]]
                     flag = True
                     rows = len(oQ)
                     for o in oQ:
@@ -350,11 +357,11 @@ def ypsi_sales_search(request):
                     csvfile = open('%s/csv/result%s.csv'%(MEDIA_ROOT,request.user.get_profile().shop_id),'wb')
                     csvfile.write(codecs.BOM_UTF8)
                     w = csv.writer(csvfile)
-                    w.writerow(["编号","日期","产品名称","尺寸","类别","价格","数量","小计"])
+                    w.writerow(["编号","店铺","日期","产品名称","尺寸","类别","价格","数量","小计"])
                     for o in oQ.order_by("date"):
                         odQ = SellOrderDetail.objects.filter(oid=o.id)
                         for od in odQ:
-                            w.writerow([i, o.date, od.product.name.encode('utf8'),od.product.size,od.product.category.name.encode('utf8'),od.price,od.quantity,od.price*od.quantity])
+                            w.writerow([i,o.shop.name.encode('utf8'), o.date, od.product.name.encode('utf8'),od.product.size,od.product.category.name.encode('utf8'),od.price,od.quantity,od.price*od.quantity])
                             i += 1
                         t_total += o.total
                         d_total += o.discount
@@ -375,7 +382,7 @@ def ypsi_sales_search(request):
                     eArr.append("无匹配记录")
     else:
         return render_to_response("app/sales_show.html",{"page_title":"订单详情"})
-    return HttpResponse(simplejson.dumps({"flag":flag,"rows":rows,"data":eArr,"oStr":oStr,"t_total":t_total},ensure_ascii=False), mimetype="text/plain")
+    return HttpResponse(simplejson.dumps({"flag":flag,"level":level,"rows":rows,"data":eArr,"oStr":oStr,"t_total":t_total},ensure_ascii=False), mimetype="text/plain")
 
 '''
 def ypsi_sales_explort(request):
@@ -456,6 +463,7 @@ def ypsi_sales_add(request):
 
                     if flag:
                         for i,od in enumerate(oStr['orderDetail']):
+                            productId = get_object_or_404(Products, id=od['product'])
                             if od['id']:
                                 SellOrderDetail.objects.filter(id=int(od['id'])).update(price=od['price'],quantity=od['quantity'])
                                 idArr.append(od['id'])
@@ -513,10 +521,11 @@ def ypsi_sales_add(request):
 
 def ypsi_sales_show(request):
     qStr = request.GET.get('q',"")
+    s_list = Shop.objects.exclude(name="总部").only("id","name")
     if len(qStr)<1:
-        page_title = "订单修改"
+        page_title = "订单查询 / 修改"
         #shopId = get_object_or_404(Shop, id=request.user.get_profile().shop_id)
-        return render_to_response('app/sales_show.html',{"page_title":page_title,"shop_id":request.user.get_profile().shop.id})
+        return render_to_response('app/sales_show.html',{"page_title":page_title,"shop_id":request.user.get_profile().shop.id,"s_list":s_list,"level":request.user.get_profile().level})
     else:
         flag = True
         data = []

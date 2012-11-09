@@ -129,13 +129,11 @@
 
     function postSearch(reload,type,count){
             var postData;
-
             if (type == "simple" || type == "exact"){
                 postData="{'type':'"+type+"','page':'"+thePage+"','count':'"+count+"'}"
             }
-
             else{
-                postData = "{'type':'"+type+"','page':'"+thePage+"','code':'"+ $("#code_input").val() +"','staff':'"+$("#staff_id_input").val()+"','customer':'"+ $("#customer_id_input").val()+"','sDate':'"+$("#date_start_input").val()+
+                postData = "{'type':'"+type+"','page':'"+thePage+"','code':'"+ $("#code_input").val() +"','shop':'"+$("#shop_input").val()+"','staff':'"+$("#staff_id_input").val()+"','customer':'"+ $("#customer_id_input").val()+"','sDate':'"+$("#date_start_input").val()+
                            "','eDate':'"+$("#date_end_input").val()+"','note':'"+$("#note_input").val()+"','hidden':'"+$("#hidden_input").is(":checked")+"'}";
             }
                         $.ajax({type: "POST",
@@ -270,9 +268,21 @@
         <input type="text" id="date_start_input" class="ac_input" style="width: 120px" title="为避免数据量过大，系统只回溯3个月内的订单" />-
         <input type="text" id="date_end_input"  class="ac_input" style="width: 120px" />
         快速导航：<a href="javascript:void(0)" id="simple1" title="前1条订单" class="blue">前1条</a> <a href="javascript:void(0)" id="simple10" title="前10条订单" class="blue">前10条</a> <a href="javascript:void(0)" id="simple100" title="前30条订单" class="blue">前100条</a></p>
-        <p><label for="staff_input">销售人员: </label>
-        <input type="text" id="staff_input" class="ac_input ac_init png" maxlength="10" style="width: 121px" />
-        <input type="text" id="staff_id_input" style="display: none"/>
+        <p>
+        {% if level < 5 %}
+            <label for="shop_input">选择店铺: </label>
+            <select id="shop_input" style="margin:0 6px 0 4px; width: 125px">
+                <option value="0">所有店铺</option>
+                {% for s in s_list %}<option value="{{ s.id }}">{{ s.name }}</option>{% endfor %}
+            </select>
+            <input type="text" id="staff_input" style="display: none"/>
+            <input type="text" id="staff_id_input" style="display: none"/>
+        {% else %}
+            <input type="text" id="shop_input" style="display: none"/>
+            <label for="staff_input">销售人员: </label>
+            <input type="text" id="staff_input" class="ac_input ac_init png" maxlength="10" style="width: 121px" />
+            <input type="text" id="staff_id_input" style="display: none"/>
+        {% endif %}
         <label for="customer_input">顾客: </label>
         <input type="text" id="customer_input" class="ac_input ac_init png" maxlength="10" style="width:121px"/>
         <input type="text" id="customer_id_input" maxlength="100" style="display: none"/>
