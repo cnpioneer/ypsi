@@ -34,7 +34,7 @@
             return date;
             }
 
-         $("#date_start_input").datepicker({showOn: "focus",constrainInput:"true",minDate:"-3m"});
+         $("#date_start_input").datepicker({showOn: "focus",constrainInput:"true",minDate:""});
          $("#date_end_input").datepicker({showOn: "focus",constrainInput:"true"});
          $("#date_end_input").datepicker('setDate', new Date());
          $("#code_input").val("");
@@ -134,7 +134,7 @@
             }
             else{
                 postData = "{'type':'"+type+"','page':'"+thePage+"','code':'"+ $("#code_input").val() +"','shop':'"+$("#shop_input").val()+"','staff':'"+$("#staff_id_input").val()+"','customer':'"+ $("#customer_id_input").val()+"','sDate':'"+$("#date_start_input").val()+
-                           "','eDate':'"+$("#date_end_input").val()+"','note':'"+$("#note_input").val()+"','hidden':'"+$("#hidden_input").is(":checked")+"'}";
+                           "','eDate':'"+$("#date_end_input").val()+"','note':'"+$("#note_input").val()+"','hidden':'"+$("#hidden_input").is(":checked")+"','explort':'"+$("#explort_input").is(":checked")+"'}";
             }
                         $.ajax({type: "POST",
                             url: "/sales/search/",
@@ -148,7 +148,7 @@
                                 //$.blockUI({ message: '<h3><img src="/static/images/css/load.gif" /> 结果获取中（提醒：系统只回溯3个月内的订单）...</h3>'});
                             },
                             success:function(msg){
-                                if (msg.rows > 0 && type == "normal"){$("#explort_csv").show();}
+                                if (msg.rows > 0 && type == "normal" && $("#explort_input").is(":checked")){$("#explort_csv").show();}
                                 else {$("#explort_csv").hide();}
                                 if (msg.flag){
                                     //console.log(msg.data)
@@ -166,10 +166,7 @@
                                     PageClick = function(pageclickednumber) {
                                     $("#pager_div").pager({ pagenumber: pageclickednumber, pagecount: pageCount, buttonClickCallback: PageClick });
                                     thePage = pageclickednumber;
-
                                     postSearch(false,"normal",0);
-
-
                                     //$("#result").html("Clicked Page " + pageclickednumber);
                                 };
                                 $("#pager_div").pager({ pagenumber: thePage, pagecount: pageCount, buttonClickCallback: PageClick });
@@ -226,9 +223,9 @@
         if ($("#staff_input").val().length<1){$("#staff_id_input").val("")}
         if ($("#date_start_input").val().length>0){
         var sDate = new Date($("#date_start_input").val());
-        if ((new Date()-sDate)/(1000*24*3600) > 93) {
+        /*if ((new Date()-sDate)/(1000*24*3600) > 93) {
             showErr("为避免数据量过大，系统只回溯3个月内的订单",true);
-        }
+        }*/
     }
             //(($("#money_less_input").val().length<1 || (/^[0-9]+(.[0-9]{2}|.[0-9]{1})?$/.test($("#money_less_input").val()))) && ($("#money_more_input").val().length<1 || /^[0-9]+(.[0-9]{2}|.[0-9]{1})?$/.test($("#money_more_input").val()))) || showErr("价格应为整数或最多两位小数的数字",true);
             if (!flag){
@@ -264,9 +261,9 @@
     <div id="order_search" class="add_cart">
         <p><label for="code_input">订单编号: </label>
         <input type="text" id="code_input" class="ac_input" maxlength="20" style="width:300px" />
-        <label>日期区间: </label>
-        <input type="text" id="date_start_input" class="ac_input" style="width: 120px" title="为避免数据量过大，系统只回溯3个月内的订单" />-
-        <input type="text" id="date_end_input"  class="ac_input" style="width: 120px" />
+        <label>日期: </label>
+        <input type="text" id="date_start_input" class="ac_input" style="width: 118px" title="店长以下级别人员只可回溯3个月内订单" />-
+        <input type="text" id="date_end_input"  class="ac_input" style="width: 118px" />
         快速导航：<a href="javascript:void(0)" id="simple1" title="前1条订单" class="blue">前1条</a> <a href="javascript:void(0)" id="simple10" title="前10条订单" class="blue">前10条</a> <a href="javascript:void(0)" id="simple100" title="前30条订单" class="blue">前100条</a></p>
         <p>
         {% if level < 5 %}
@@ -286,11 +283,13 @@
         <label for="customer_input">顾客: </label>
         <input type="text" id="customer_input" class="ac_input ac_init png" maxlength="10" style="width:121px"/>
         <input type="text" id="customer_id_input" maxlength="100" style="display: none"/>
-        <label for="note_input">订单备注: </label>
-        <input type="text" id="note_input" class="ac_input" style="width:266px" />
+        <label for="note_input">备注: </label>
+        <input type="text" id="note_input" class="ac_input" style="width:262px" />
         <label for="hidden_input">已删</label>
         <input type="checkbox" id="hidden_input"  class="ac_input"  style="cursor: default"/>
-        <button type="submit" id="order_search_btn" class="m_btn"><img src="/static/images/css/search_small.png" class=" png"> 检索 </button> <a id="explort_csv" href="/static/uploads/csv/result{{  shop_id }}.csv" class="blue">报表下载</a></p>
+        <label for="explort_input">生成报表</label>
+        <input type="checkbox" id="explort_input"  class="ac_input"  style="cursor: default"/>
+        <button type="submit" id="order_search_btn" class="m_btn"><img src="/static/images/css/search_small.png" class=" png"> 检索 </button> <a id="explort_csv" href="/static/uploads/csv/result{{  shop_id }}.csv" class="blue">下载</a></p>
     </div>
     <div id="frame_pa" style="display: none;" >
         <iframe id='sale_edit_frame' scrolling='auto' src='' frameborder='0' width="100%" height="100%"></iframe>

@@ -181,30 +181,40 @@ def user_login(request):
 @login_required
 def ypsi_index(request):
     request.session.set_expiry(0) #关闭浏览器session失效
+    user = request.user.get_profile()
+    last_login = request.user.last_login
     act = request.GET.get("act","")
-    page_errs=[]
+    wmode = request.GET.get("w","")
+    page_errs=""
     #date_list(12)#读取指定时间段
     days = request.GET.get('days',7)
     try:
         days = int(days)
     except :
-        page_errs.append("请输入正确参数")
+        page_errs=("请输入正确参数")
     #print isinstance(int(days),int)
-    dlist = ypsi_sell_list(days)[0]
-    s_str=ypsi_sell_list(days)[1]
-    page_title = '首页'
-    plist = Posts.objects.filter(hidden=0).order_by("-id")
-    slist = SellOrder.objects.filter(hidden=0).order_by("-id")[:10]
-    if act == "getData":
-        jStr = {"plist":[],"slist":[]}
-        for p in plist:
-            jStr["plist"].append({"title":p.title,"note":p.note,"date":datetime.datetime.strftime(p.date,'%Y-%m-%d')})
-        for s in slist:
-            jStr["slist"].append({"sid":s.id,"shop":s.shop.name,"staff":s.staff.name,"amount":s.total,"date":datetime.datetime.strftime(s.date,'%Y-%m-%d %H:%M:%S')})
-        return HttpResponse(simplejson.dumps({"plist":jStr["plist"],"slist":jStr["slist"],"dlist":dlist,"s_str":s_str},ensure_ascii=False), mimetype="text/plain")
+    if user.level > 5 and wmode <> "1" and days > 60 :
+        page_errs=("普通模式下可统计天数上限为60日 <a href='?w=1&days=120'><span><img src='/static/images/css/chart16.png'/> 切换宽屏模式查看更多</span></a> 或 <a href='javascript:history.go(-1)'>返回上一页</a>")
+    elif user.level > 5 and wmode == "1" and days > 120 :
+        page_errs=("店长以下级别人员可统计天数上限为120日")
+    if page_errs == "":
+        dlist = ypsi_sell_list(days)[0]
+        s_str=ypsi_sell_list(days)[1]
+        page_title = u"首页"
+        plist = Posts.objects.filter(hidden=0).order_by("-id")
+        slist = SellOrder.objects.filter(hidden=0).order_by("-id")[:10]
+        if act == "getData":
+            jStr = {"plist":[],"slist":[],"err":page_errs}
+            for p in plist:
+                jStr["plist"].append({"title":p.title,"note":p.note,"date":datetime.datetime.strftime(p.date,'%Y-%m-%d')})
+            for s in slist:
+                jStr["slist"].append({"sid":s.id,"shop":s.shop.name,"staff":s.staff.name,"amount":s.total,"date":datetime.datetime.strftime(s.date,'%Y-%m-%d %H:%M:%S')})
+            return HttpResponse(simplejson.dumps({"page_title":page_title,"plist":jStr["plist"],"slist":jStr["slist"],"dlist":dlist,"s_str":s_str},ensure_ascii=False), mimetype="text/plain")
+        else:
+            return render_to_response('app/index.html',{"err":page_errs,"user":user,"last_login":last_login,"plist":plist,"slist":slist,"dlist":dlist,"s_str":s_str,"wmode":wmode})
     else:
-        return render_to_response('app/index.html',locals())
-
+        return HttpResponse("<html><center>%s</center></html>"%page_errs)
+    
 @login_required
 def ypsi_sales(request):
     page_title = '新增订单 - 销售管理'
@@ -246,20 +256,32 @@ def ypsi_sales_search(request):
         t_total = 0
         oStr = eval(request.raw_post_data)
         level = request.user.get_profile().level
-        if oStr["shop"]  == "0": #shop_input优先传递shop筛选值
+        shop_id = oStr.get("shop","")
+        if shop_id  == "0": #shop_input优先传递shop筛选值
             ShopId = "0"
-        elif oStr["shop"]:
+        elif shop_id:
             ShopId = get_object_or_404(Shop, id=oStr["shop"])
         else:
             ShopId = get_object_or_404(Shop, id=request.user.get_profile().shop_id)
+
         if oStr["type"] is "all" or ShopId == "0":
             oQ = SellOrder.objects.all().order_by('-id')
         else:
             oQ = SellOrder.objects.filter(shop=ShopId).order_by('-id')
 
-        if oStr["type"] is "simple" or oStr["type"] is "exact":
+        if oStr["type"] is "simple":
+            if ShopId == "0" or level < 5:
+                oQ = SellOrder.objects.all().order_by('-id')[:oStr["count"]]
+            else:
+                oQ = SellOrder.objects.filter(shop=ShopId).order_by('-id')[:oStr["count"]]
             flag = True
-
+            rows = len(oQ)
+            for o in oQ:
+                t_total = t_total + o.total
+        elif oStr["type"] is "exact":
+            oQ = SellOrder.objects.filter(id=oStr["count"],hidden=0)
+            flag = True
+            rows = len(oQ)
         else:
             Reg = re.match(ur"^[A-Za-z0-9]{0,20}$",oStr["code"])
             if Reg is None:
@@ -293,8 +315,8 @@ def ypsi_sales_search(request):
             if oStr["sDate"]:
                 if time.strptime(oStr["sDate"], "%Y-%m-%d"):
                     sDate = time.strptime(oStr["sDate"], "%Y-%m-%d")
-                    if datetime.datetime.now() - datetime.timedelta(days=92)>datetime.datetime(*sDate[:6]):
-                        eArr.append("为避免数据量过大，系统只回溯3个月内的订单")
+                    if level > 5 and datetime.datetime.now() - datetime.timedelta(days=93)>datetime.datetime(*sDate[:6]):
+                        eArr.append("店长以下级别人员只可回溯3个月内订单")
                     else:
                         oQ = oQ.filter(date__gte=datetime.datetime(*sDate[:6]))
                 else:
@@ -337,21 +359,17 @@ def ypsi_sales_search(request):
         if len(eArr)<1:
             rows = len(oQ)
             if rows>0:
-                if oStr["type"] is "simple":
-                    if ShopId == "0":
-                        oQ = SellOrder.objects.all().order_by('-id')[:oStr["count"]]
+                for o in oQ:
+                    if o.customer:
+                        ctm = o.customer.name
+                        cti = o.customer_id
                     else:
-                        oQ = SellOrder.objects.filter(shop=ShopId).order_by('-id')[:oStr["count"]]
-                    flag = True
-                    rows = len(oQ)
-                    for o in oQ:
-                        t_total = t_total + o.total
-                elif oStr["type"] is "exact":
-                    oQ = SellOrder.objects.filter(id=oStr["count"],hidden=0)
-                    flag = True
-                    rows = len(oQ)
-                    
-                else:
+                        ctm =u"未登记"
+                        cti = 0
+                    t_total += o.total
+                    eArr.append({"id":o.id,"code":o.code,"total":o.total,"discount":str(o.discount), "date":o.date.strftime("%Y-%m-%d"),"customer":ctm,"customer_id":cti,"staff":o.staff.name,"staff_id":o.staff_id,"note":o.note,"hidden":o.hidden})
+
+                if oStr.get("explort","") == "true":
                     i = 1
                     d_total = 0
                     csvfile = open('%s/csv/result%s.csv'%(MEDIA_ROOT,request.user.get_profile().shop_id),'wb')
@@ -363,21 +381,13 @@ def ypsi_sales_search(request):
                         for od in odQ:
                             w.writerow([i,o.shop.name.encode('utf8'), o.date, od.product.name.encode('utf8'),od.product.size,od.product.category.name.encode('utf8'),od.price,od.quantity,od.price*od.quantity])
                             i += 1
-                        t_total += o.total
                         d_total += o.discount
-                    w.writerow(["","","","","折扣总额",d_total,"实收",t_total])
+                    w.writerow(["","","","","","折扣总额",d_total,"实收",t_total])
                     csvfile.close()
-                    mP = (int(oStr["page"])-1)*20
-                    oQ = oQ[mP:mP+20]
-                    flag = True
-                for o in oQ:
-                    if o.customer:
-                        ctm = o.customer.name
-                        cti = o.customer_id
-                    else:
-                        ctm =u"未登记"
-                        cti = 0
-                    eArr.append({"id":o.id,"code":o.code,"total":o.total,"discount":str(o.discount), "date":o.date.strftime("%Y-%m-%d"),"customer":ctm,"customer_id":cti,"staff":o.staff.name,"staff_id":o.staff_id,"note":o.note,"hidden":o.hidden})
+
+                mP = (int(oStr["page"])-1)*20
+                oQ = oQ[mP:mP+20]
+                flag = True
             else:
                     eArr.append("无匹配记录")
     else:
