@@ -275,9 +275,7 @@ def ypsi_sales_search(request):
             else:
                 oQ = SellOrder.objects.filter(shop=ShopId).order_by('-id')[:oStr["count"]]
             flag = True
-            rows = len(oQ)
-            for o in oQ:
-                t_total = t_total + o.total
+
         elif oStr["type"] is "exact":
             oQ = SellOrder.objects.filter(id=oStr["count"],hidden=0)
             flag = True
@@ -359,15 +357,19 @@ def ypsi_sales_search(request):
         if len(eArr)<1:
             rows = len(oQ)
             if rows>0:
-                for o in oQ:
+                mP = (int(oStr["page"])-1)*20
+                oQ2 = oQ[mP:mP+20]
+                flag = True
+                for o in oQ2:
                     if o.customer:
                         ctm = o.customer.name
                         cti = o.customer_id
                     else:
                         ctm =u"未登记"
                         cti = 0
-                    t_total += o.total
                     eArr.append({"id":o.id,"code":o.code,"total":o.total,"discount":str(o.discount), "date":o.date.strftime("%Y-%m-%d"),"customer":ctm,"customer_id":cti,"staff":o.staff.name,"staff_id":o.staff_id,"note":o.note,"hidden":o.hidden})
+                for o in oQ:
+                    t_total += o.total
 
                 if oStr.get("explort","") == "true":
                     i = 1
@@ -385,14 +387,11 @@ def ypsi_sales_search(request):
                     w.writerow(["","","","","","折扣总额",d_total,"实收",t_total])
                     csvfile.close()
 
-                mP = (int(oStr["page"])-1)*20
-                oQ = oQ[mP:mP+20]
-                flag = True
             else:
-                    eArr.append("无匹配记录")
+                eArr.append("无匹配记录")
     else:
         return render_to_response("app/sales_show.html",{"page_title":"订单详情"})
-    return HttpResponse(simplejson.dumps({"flag":flag,"level":level,"rows":rows,"data":eArr,"oStr":oStr,"t_total":t_total},ensure_ascii=False), mimetype="text/plain")
+    return HttpResponse(simplejson.dumps({"flag":flag,"level":level,"rows":rows,"data":eArr,"oStr":oStr,"t_total":t_total,"type":oStr["type"]},ensure_ascii=False), mimetype="text/plain")
 
 '''
 def ypsi_sales_explort(request):
@@ -597,7 +596,7 @@ def ypsi_sales_chart(request):
     return HttpResponse("Just Wait a moument ...", mimetype="text/plain")
 
 @login_required()
-def ypsi_depots(request):
+def ypsi_depots(request):#查询店铺库存时产品 当前店铺库存项目 循环不合理，待修正
     page_title = "库存状况概览"
     act = request.GET.get("act","")
     qid = request.GET.get("id","")
@@ -610,7 +609,7 @@ def ypsi_depots(request):
         sdp_list = []
         stq_list = []
         cursor = connection.cursor()
-        if act == "shop" and qid:
+        if (act == "shop" or act == "explort") and qid:
             shop = get_object_or_404(Shop,id=qid)
             page_title = u"%s 当前库存产品一览"%shop.name
             cursor.execute("select psi_outdetail.product_id,(sum(quantity)-ifnull(sq,0)) as tq from psi_outdetail,psi_outstream left join "
@@ -632,6 +631,24 @@ def ypsi_depots(request):
             stq_list.append(s[1])
         p_list = Products.objects.filter(hidden=0,id__in=sdp_list).order_by("-id")
 
+        if act == "explort":
+            response = HttpResponse(mimetype="text/csv")
+            #response.write(codecs.BOM_UTF8)
+            response.write("\xEF\xBB\xBF")
+            response["Content-Disposition"] = "attachment; filename=库存统计表.csv"
+            writer = csv.writer(response)
+            #writer.writerow([u"名称".encode("GBK"),u"条码".encode("GBK"),u"尺寸".encode("GBK"),u"当前库存".encode("GBK"),u"各仓库总库存".encode("GBK"),u"状态".encode("GBK")])
+            writer.writerow(["编号","名称","条码","尺寸","当前库存","仓库总库存","状态"])
+            i = 1
+            for p,s in zip(p_list,stq_list):
+                i += 1
+                if p.hidden == 1:
+                    pStatus = u"已删除"
+                else:
+                    pStatus = u"正常"
+                writer.writerow([i,p.name.encode('utf8'),p.barcode,p.size,s,p.p_str[1],pStatus.encode('utf8')])
+            return response
+
         paginator = Paginator(p_list, 20)
         after_range_num = 5
         befor_range_num = 4
@@ -652,7 +669,7 @@ def ypsi_depots(request):
     s_list = Shop.objects.exclude(name="总部").only("id","name")
     d_list = Depot.objects.filter(hidden=0).only("id","name")
 
-    return render_to_response('app/depots.html',{"page_title":page_title,"s_list":s_list,"d_list":d_list,"p_list":p_list,"level":level,"r_list":pd_list,"st_list":st_list,"url":"?act=%s&id=%s"%(act,qid),"page_range":page_range,"rows":len(p_list)})
+    return render_to_response('app/depots.html',{"page_title":page_title,"s_list":s_list,"d_list":d_list,"p_list":p_list,"level":level,"r_list":pd_list,"st_list":st_list,"url":"?act=%s&id=%s"%(act,qid),"qid":qid,"page_range":page_range,"rows":len(p_list)})
 
 def ypsi_depots_charts(request):
     qStr = request.GET.get("type","")
@@ -1004,11 +1021,14 @@ def ypsi_depots_out(request):
                 pid = get_object_or_404(Products, id=oId)
                 pname = pid.name
                 did = request.GET.get("did","0")
+                sid = request.GET.get("sid","0")
                 if did == "0":
-                    outds = OutDetail.objects.filter(product=pid,quantity__gt=0).values_list("outid")
+                    outds = OutDetail.objects.filter(product=pid,quantity__gt=0)
                 else:
-                    outds = OutDetail.objects.filter(product=pid,quantity__gt=0,depot=did).values_list("outid")
-                out = OutStream.objects.filter(id__in=outds).order_by("-id")
+                    outds = OutDetail.objects.filter(product=pid,quantity__gt=0,depot=did)
+                if sid <> "0":
+                    outds = outds.filter(outid__shop=get_object_or_404(Shop, id=sid))
+                out = OutStream.objects.filter(id__in=outds.values_list("outid")).order_by("-id")
                 slist = OutDetail.objects.filter(outid__in=out,quantity__gt=0,product=oId).values("outid","product").annotate(tq=Sum("quantity")).order_by("-outid")
                 for (o,q) in zip(out,slist):
                     o.pq = q["tq"]

@@ -85,10 +85,10 @@
 
 
 
-        $("#order_search [href='javascript:void(0)']").click(function(event) {
-            if ($(this).attr("id")=="simple10") {postSearch(true,"simple",10)}
+        $("#order_search [href='javascript:void(0)']").click(function() {
+            if ($(this).attr("id")=="simple10") {postSearch(false,"simple",10)}
             else if ($(this).attr("id")=="simple100") {postSearch(true,"simple",100)}
-            else  {postSearch(true,"simple",1)}
+            else  {postSearch(false,"simple",1)}
         });
 
         $("#result_div [href='javascript:void(0)']").live('click', function(event) {
@@ -130,7 +130,8 @@
     function postSearch(reload,type,count){
             var postData;
             if (type == "simple" || type == "exact"){
-                postData="{'type':'"+type+"','page':'"+thePage+"','count':'"+count+"'}"
+                if (reload == false){postData="{'type':'"+type+"','page':'"+1+"','count':'"+count+"'}";}
+                else{postData="{'type':'"+type+"','page':'"+thePage+"','count':'"+count+"'}";}
             }
             else{
                 postData = "{'type':'"+type+"','page':'"+thePage+"','code':'"+ $("#code_input").val() +"','shop':'"+$("#shop_input").val()+"','staff':'"+$("#staff_id_input").val()+"','customer':'"+ $("#customer_id_input").val()+"','sDate':'"+$("#date_start_input").val()+
@@ -166,7 +167,8 @@
                                     PageClick = function(pageclickednumber) {
                                     $("#pager_div").pager({ pagenumber: pageclickednumber, pagecount: pageCount, buttonClickCallback: PageClick });
                                     thePage = pageclickednumber;
-                                    postSearch(false,"normal",0);
+                                    if (msg.type=="simple"){postSearch(true,"simple",100);}
+                                    else{postSearch(false,"normal",0);}
                                     //$("#result").html("Clicked Page " + pageclickednumber);
                                 };
                                 $("#pager_div").pager({ pagenumber: thePage, pagecount: pageCount, buttonClickCallback: PageClick });
