@@ -447,6 +447,9 @@
                         {{ pname }}
                     {% endif %}
                     出库提要列表
+                    {% if ototal > 0 %}
+                        总计{{ ototal }}件
+                    {% endif %}
                 {% endif %}
             </div>
             <div style="float: right;">共{{ rows }}条记录 {{ out_list.number }}/{{ out_list.paginator.num_pages }}页

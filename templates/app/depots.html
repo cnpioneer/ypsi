@@ -57,8 +57,8 @@
              }
          });
         $('#search_btn').click(function() {
-            var r_url = "/depots/in/?act=search&id="+$("#pid").val()+"&did="+$("#depot_id").val()+"&sid="+$("#shop_id").val();
-            if ($("#in_or_out").val()==2){ r_url = "/depots/out/?act=search&id="+$("#pid").val()+"&did="+$("#depot_id").val()+"&sid="+$("#shop_id").val();}
+            var r_url = "/depots/in/?act=search&id="+$("#pid").val()+"&did="+$("#depot_id").val()+"&sid="+$("#shop_id").val()+"&hidden="+$("#hidden_input").is(":checked");
+            if ($("#in_or_out").val()==2){ r_url = "/depots/out/?act=search&id="+$("#pid").val()+"&did="+$("#depot_id").val()+"&sid="+$("#shop_id").val()+"&hidden="+$("#hidden_input").is(":checked");}
             //$("#p_search").attr("action",r_url).submit();
             window.location=r_url;
         });
@@ -173,30 +173,32 @@
     <form id="p_search" action="." method="get">
         <label for="name_input">产品出入库记录查询：</label><input type="text" id="name_input" class="ac_input" maxlength="20" style="width:120px" title="请最少输入两个关键字符便于查找"/>
         <input type="text" id="pid" style="display: none"/>
-        <label for="in_or_out" style="margin-left: 10px">选择入库 / 出库</label>
+        <label for="in_or_out" style="margin-left: 10px">选择</label>
             <select id="in_or_out">
                 {% if level < 5%}
                 <option value="1">入库记录</option>
                 {% endif %}
                 <option value="2">出库记录</option>
             </select>
-        <label for="depot_id" style="margin-left: 10px"> 选择仓库</label>
+        <label for="depot_id" style="margin-left: 10px"> 仓库</label>
             <select id="depot_id">
                 <option value="0">全部仓库</option>
                 {% for d in d_list %}<option value="{{ d.id }}" >{{ d.name }}</option>{% endfor %}
             </select>
-        <label for="shop_id" style="margin-left: 10px"> 选择店铺</label>
+        <label for="shop_id" style="margin-left: 10px"> 店铺</label>
                 <select id="shop_id">
                     <option value="0">全部店铺</option>
                     {% for s in s_list %}<option value="{{ s.id }}" >{{ s.name }}</option>{% endfor %}
                 </select>
+        <label for="hidden_input" style="margin-left: 10px"> 包含已删</label>
+        <input type="checkbox" id="hidden_input"  class="ac_input"  style="cursor: default"/>
         <button type="button" class="m_btn" id="search_btn" style="margin-left: 20px"><span><img src="/static/images/css/ok_small.png" class="png"></span> 提交查询</button>
     </form>
     </div>
     <div style="margin-top: 40px;border: 1px solid #cccccc;border-radius: 6px;">
     <div style="border-bottom: 1px solid #ccc;padding: 4px 10px ;background-color:#eeeeee;border-radius: 5px 5px 0 0;overflow:auto;*height:1%;">
         <div style="float:left;"><img src="/static/images/css/depot_small.png" class="png"> {{ page_title }}
-            {% if qid %}<a href="?act=explort&id={{ qid }}" class="blue">生成excel表格</a>{% endif %}
+            {% if qid %}<a href="{{ url }}&explort=true" class="blue">生成excel表格</a>{% endif %}
         </div>
         <div style="float:right;">
             {% if rows %}共{{ rows }}条记录 {{ r_list.number }}/{{ r_list.paginator.num_pages }}页 {% endif %}

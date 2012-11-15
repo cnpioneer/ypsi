@@ -102,6 +102,7 @@
                    chartOptions.chart.renderTo=div;
                    chartOptions.title.text=name;
                    if (chartype=="spline"){
+                       chartOptions.tooltip.crosshairs=true;
                        chartOptions.tooltip.formatter=(function(){return '<b>'+ this.point.name +'</b>: 销售'+this.point.y +' 件';})
                    }
                    new Highcharts.Chart(chartOptions);
@@ -116,7 +117,7 @@
         $("#search_btn").attr("disabled",true);
         showChart("仓库分布一览","c1","pdp","pie",0);
         showChart("各店分布一览","c2","psp","pie",0);
-        showChart("历史销售一览","c3","pssp","spline",{{ sid }});
+        showChart("历史销售一览","c3","pssp","spline","{{ sid }}");
     });
 	</script>
 {% endblock %}

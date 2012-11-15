@@ -26,7 +26,7 @@ def product_autocomplete(request):
     pId = "".join(request.GET.get('pid',"").split())
     type = "".join(request.GET.get('type',"").split())
     if pId:
-        if len(OutStream.objects.filter(shop=staff.shop_id))>0:#当前店铺是否存在该商品出库记录
+        if len(OutStream.objects.filter(shop=staff.shop_id).exclude(hidden=1))>0:#当前店铺是否存在该商品出库记录
             cursor = connection.cursor()
             cursor.execute ("select oQuantity-ifNull(sQuantity,0) as nQuantity from \
             (select sum(quantity) as oQuantity,pid from PSI_OutDETAIL,psi_outStream  join \
@@ -211,7 +211,7 @@ def ypsi_index(request):
                 jStr["slist"].append({"sid":s.id,"shop":s.shop.name,"staff":s.staff.name,"amount":s.total,"date":datetime.datetime.strftime(s.date,'%Y-%m-%d %H:%M:%S')})
             return HttpResponse(simplejson.dumps({"page_title":page_title,"plist":jStr["plist"],"slist":jStr["slist"],"dlist":dlist,"s_str":s_str},ensure_ascii=False), mimetype="text/plain")
         else:
-            return render_to_response('app/index.html',{"err":page_errs,"user":user,"last_login":last_login,"plist":plist,"slist":slist,"dlist":dlist,"s_str":s_str,"wmode":wmode})
+            return render_to_response("app/index.html",{"page_title":page_title,"err":page_errs,"user":user,"last_login":last_login,"plist":plist,"slist":slist,"dlist":dlist,"s_str":s_str,"wmode":wmode})
     else:
         return HttpResponse("<html><center>%s</center></html>"%page_errs)
     
@@ -416,7 +416,6 @@ def ypsi_sales_add(request):
         sDate = oStr.get("date","")
         flag = True
         msg = ""
-
         #print oStr
 
         if sId :
@@ -456,9 +455,7 @@ def ypsi_sales_add(request):
                                 flag = False
                                 msg = "销售时间不能在今日之后"
                     idArr = []
-
                     for i,od in enumerate(oStr['orderDetail']):
-                        productId = get_object_or_404(Products, id=od['product'])
                         regP = re.match(ur"^\d+\.?\d{0,2}$",od['price'])
                         if regP is None:
                             flag = False
@@ -508,7 +505,6 @@ def ypsi_sales_add(request):
                     newSellOrder = SellOrder(shop=shopId,staff=staffId,customer=customerId,code=oStr['code'],discount=oStr['discount'],note=oStr['note'],date=datetime.datetime.strftime(datetime.datetime.now(),'%Y-%m-%d %H:%M:%S'))
                 newSellOrder.save()
                 for i,od in enumerate(oStr['orderDetail']):
-                    productId = get_object_or_404(Products, id=od['product'])
                     regP = re.match(ur"^\d+\.?\d{0,2}$",od['price'])
                     if regP is None:
                         flag = False
@@ -519,6 +515,28 @@ def ypsi_sales_add(request):
                     if regQ is None:
                         flag = False
                         msg = "订单第%s项产品数量错误,请修正后重新提交"%(i+1)
+                        break
+
+                    cursor = connection.cursor()
+                    productId = get_object_or_404(Products, id=od['product'])
+                    if len(OutStream.objects.filter(shop=shopId).exclude(hidden=1))>0:#当前店铺是否存在出库记录
+                        cursor.execute ("select oQuantity-ifNull(sQuantity,0) as nQuantity from \
+                        (select sum(quantity) as oQuantity,pid from PSI_OutDETAIL,psi_outStream  join \
+                        (select id as pid from psi_products) on pid = product_id where pid=%s and outId_id=psi_outStream.id and psi_outstream.hidden=0 and shop_id=%s group by product_id ) \
+                        left join \
+                        (select psi_sellOrderDetail.product_id as sPid,sum(psi_sellOrderDetail.quantity) as sQuantity from psi_sellOrderDetail,psi_sellOrder where hidden=0 and oid_id=psi_sellOrder.id and shop_id=%s group by psi_sellOrderDetail.product_id) \
+                        on  pid=sPid order by nQuantity desc;",[productId.id,shopId.id,shopId.id])
+                        tags = cursor.fetchone()
+                        cursor.close()
+                        if tags:
+                            pq = tags[0]
+                        else:
+                            pq = 0
+                    else:
+                        pq = 0
+                    if int(od['quantity']) > pq:
+                        flag = False
+                        msg = u"%s 数量超出库存，请返回销售页面刷新重试"%productId.name
                         break
 
                     if flag:
@@ -631,7 +649,7 @@ def ypsi_depots(request):#查询店铺库存时产品 当前店铺库存项目 �
             stq_list.append(s[1])
         p_list = Products.objects.filter(hidden=0,id__in=sdp_list).order_by("-id")
 
-        if act == "explort":
+        if request.GET.get("explort","") == "true":
             response = HttpResponse(mimetype="text/csv")
             #response.write(codecs.BOM_UTF8)
             response.write("\xEF\xBB\xBF")
@@ -901,6 +919,7 @@ def ypsi_depots_out(request):
     level = request.user.get_profile().level
     page_title = "出库单列表"
     pname = ""
+    ototal = 0
     if act == "add":
         page_title = "新增出库提要信息"
         if request.POST:
@@ -1022,17 +1041,25 @@ def ypsi_depots_out(request):
                 pname = pid.name
                 did = request.GET.get("did","0")
                 sid = request.GET.get("sid","0")
+                hide = request.GET.get("hidden","false")
+
                 if did == "0":
                     outds = OutDetail.objects.filter(product=pid,quantity__gt=0)
                 else:
                     outds = OutDetail.objects.filter(product=pid,quantity__gt=0,depot=did)
                 if sid <> "0":
                     outds = outds.filter(outid__shop=get_object_or_404(Shop, id=sid))
-                out = OutStream.objects.filter(id__in=outds.values_list("outid")).order_by("-id")
+                if hide == "true":
+                    out = OutStream.objects.filter(id__in=outds.values_list("outid")).order_by("-id")
+                else:
+                    out = OutStream.objects.filter(id__in=outds.values_list("outid")).exclude(hidden=1).order_by("-id")
                 slist = OutDetail.objects.filter(outid__in=out,quantity__gt=0,product=oId).values("outid","product").annotate(tq=Sum("quantity")).order_by("-outid")
+
                 for (o,q) in zip(out,slist):
                     o.pq = q["tq"]
-                url = "act=search&id=%s&did=%s&"%(oId,did)
+                    ototal += o.pq#当前出库总数
+
+                url = "act=search&id=%s&did=%s&sid=%s&hidden=%s&"%(oId,did,sid,hide)
             else:
                 out = OutStream.objects.order_by("-id")
         paginator = Paginator(out, 20)
@@ -1049,7 +1076,7 @@ def ypsi_depots_out(request):
             page_range = paginator.page_range[page-after_range_num:page+befor_range_num]
         else:
             page_range = paginator.page_range[0:int(page)+befor_range_num]
-        return render_to_response('app/depots_outstream.html',{"page_title":page_title,"out_list":out_list,"page_range":page_range,"rows":len(out),"outstream":outstream,"level":level,"url":url,"pname":pname})
+        return render_to_response('app/depots_outstream.html',{"page_title":page_title,"out_list":out_list,"page_range":page_range,"rows":len(out),"outstream":outstream,"level":level,"url":url,"pname":pname,"ototal":ototal})
 
 def ypsi_depots_remit(request):
     act = request.GET.get("act","list")
