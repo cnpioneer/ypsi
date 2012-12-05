@@ -267,8 +267,7 @@
 
             if (flag && flagB && $("#data").text()=="0"){
                 $.blockUI({ message: $("#confirm"),css: {top: '20%'}});
-                $("#yes").click(function() {
-
+                $("#yes").unbind('click').click(function() {
                     var temp_str=new Array();
                     for (var i=0;i<$('#cart_tb tr:gt(0)').length;i++){
                         var tds = $($("#cart_tb tr:gt(0)")[i]).children("td");

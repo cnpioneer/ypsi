@@ -12,9 +12,9 @@
         $("#search_btn").attr("disabled",true);
         $("#shop_id").hide();
         $('label[for="shop_id"]').hide();
-        if ($("#in_or_out").val()==2){$("#shop_id").show();$('label[for="shop_id"]').show();}
+        if ($("#in_or_out").val()==2 || $("#in_or_out").val()==3){$("#shop_id").show();$('label[for="shop_id"]').show();}
         $("#in_or_out").change(function(){
-            if ($("#in_or_out").val()==2){$("#shop_id").show();$('label[for="shop_id"]').show();}
+            if ($("#in_or_out").val()==2||$("#in_or_out").val()==3){$("#shop_id").show();$('label[for="shop_id"]').show();}
             else {$("#shop_id").hide();$('label[for="shop_id"]').hide();}
         });
         function formatItem(row) {
@@ -59,6 +59,7 @@
         $('#search_btn').click(function() {
             var r_url = "/depots/in/?act=search&id="+$("#pid").val()+"&did="+$("#depot_id").val()+"&sid="+$("#shop_id").val()+"&hidden="+$("#hidden_input").is(":checked");
             if ($("#in_or_out").val()==2){ r_url = "/depots/out/?act=search&id="+$("#pid").val()+"&did="+$("#depot_id").val()+"&sid="+$("#shop_id").val()+"&hidden="+$("#hidden_input").is(":checked");}
+            else if ($("#in_or_out").val()==3){r_url = "/depots/re/?act=search&id="+$("#pid").val()+"&did="+$("#depot_id").val()+"&sid="+$("#shop_id").val()+"&hidden="+$("#hidden_input").is(":checked");}
             //$("#p_search").attr("action",r_url).submit();
             window.location=r_url;
         });
@@ -162,6 +163,7 @@
             <li><a href ="/depots/remit/">汇款</a></li>
             <li><a href ="/depots/in/">入库</a></li>
             <li><a href ="/depots/out/">出库</a></li>
+            <li><a href ="/depots/re/">退库</a></li>
             <li><a href ="/category/" target="_blank">类别管理</a></li>
             <li><a href ="/depots/product/">产品细目</a></li>
         </ul>
@@ -179,6 +181,7 @@
                 <option value="1">入库记录</option>
                 {% endif %}
                 <option value="2">出库记录</option>
+                <option value="3">退库记录</option>
             </select>
         <label for="depot_id" style="margin-left: 10px"> 仓库</label>
             <select id="depot_id">

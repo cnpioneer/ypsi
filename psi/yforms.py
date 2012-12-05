@@ -4,18 +4,10 @@ from django import forms
 from psi.models import Shop,SellOrder,Remit,Staff,Category
 from django.contrib.auth.models import User
 from django.forms import ModelForm
+from ypsi.middleware import threadlocals
 import re
-'''
-def get_shop(request):
-    if len(request)>0:
-        shop = request.user.get_profile().shop
-        if shop>0:
-            return shop
-        else:
-            return 0
-'''
 
-
+staffid = threadlocals.get_current_staffid()
 class YLogin(forms.Form):
     username = forms.CharField(max_length=20,label='姓名')
     password = forms.CharField(max_length=10,widget=forms.PasswordInput(),label='密码')
@@ -60,10 +52,11 @@ class InStream(forms.Form):
     code = forms.CharField(label="单号",required=False)
     supplier = forms.ChoiceField(label="供货单位 * ",choices=sp_choices)
     date = forms.DateField(label="日期 * ")
-    keeper = forms.ModelChoiceField(label="仓管 * ",queryset=Staff.objects.filter(level__lt=5),widget=forms.Select)
+    keeper = forms.ModelChoiceField(label="仓管 * ",queryset=Staff.objects.filter(id=staffid),widget=forms.Select,initial=staffid)
     staff1 = forms.ModelChoiceField(label="经办 * ",queryset=Staff.objects.filter(level__gte=5),widget=forms.Select)
     hidden = forms.BooleanField(label="删除标记",widget=forms.CheckboxInput,required=False)
     note = forms.CharField(max_length=100,label="备注",widget=forms.Textarea(attrs={'rows':'5'}),required=False)
+    log = forms.CharField(label="日志",widget=forms.Textarea(attrs={'row':'2','disabled':'true'}),required=False)
     def clean(self):
         cleaned_data = self.cleaned_data
         cCode = cleaned_data.get("code")
@@ -77,6 +70,7 @@ class OutStream(InStream):
     from psi.models import InStream
     supplier = forms.ModelChoiceField(label="取货店铺 * ",queryset=Shop.objects.exclude(name=u"总部"),initial=1,widget=forms.Select)
     instream = forms.ModelChoiceField(label="入库单绑定 ",empty_label="不予绑定",required=False,queryset=InStream.objects.filter(hidden=0),widget=forms.Select,help_text="非可逆操作，请谨慎选择")
+    #returned = forms.BooleanField(label="退库标记",widget=forms.CheckboxInput,required=False)
 
 class Product(forms.Form):
     name = forms.CharField(label="名称 *",min_length=2,max_length=30)

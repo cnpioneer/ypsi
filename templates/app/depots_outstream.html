@@ -43,6 +43,7 @@
         if (window.location.search.indexOf("act=edit")>-1){
             $("#id_instream").parent().hide();
         }
+        if ("{{ tt }}"=="退"){$("#id_instream").closest("li").detach();}
         //按钮点击动作配套fun
         function rm(){
                     var that = $(".focus",$("#ind_list"))[0];
@@ -71,13 +72,10 @@
                                 r_str += ("<option value="+ tData[i].split("|")[3]+" selected>"+tData[i].split("|")[0] +" "+tData[i].split("|")[1]+ "</option>\n");
                             }
                             else{r_str += ("<option value="+ tData[i].split("|")[3]+">"+tData[i].split("|")[0] +" "+tData[i].split("|")[1] + "</option>\n");}
-
-
                         }
                     $("td:eq(4)",$(".focus",$("#ind_list"))[0]).html("<select>"+r_str+"</select>");
                     $("td:eq(5)",$(".focus",$("#ind_list"))[0]).html("<select>"+r_str+"</select>");
                     });
-
                 }
                 else{
                     $("td:eq(4)",$(this)).html($("td:eq(5) select",$(this)).clone());
@@ -89,7 +87,7 @@
         });
         $("[href='javascript:void(0)']").live("click",function(){
             $.blockUI({ message: $("#confirm"),css: {top: '20%'}});
-            $('#yes').click(function() {
+            $("#yes").unbind('click').click(function() {
                 var that = $(".focus",$("#ind_list"))[0];
                 if ($("td:eq(8)",$(that)).text()){
                     $.ajax({
@@ -101,8 +99,8 @@
                         timeout:10000,
                         beforeSend: function () {
                             $.blockUI({ message: '<h3><img src="/static/images/css/load.gif" /> 操作提交中...</h3>'});},
-                        success:function(msg) {
-                            if (msg=="done"){
+                        success:function(data) {
+                            if (data=="done"){
                                 $(that).detach();
                                 $.blockUI({ message:'<h3>操作完成</h3>',timeout:1500});
                             }
@@ -125,24 +123,28 @@
 
         function iff(){$.blockUI({ message: '<h3>操作失败,请复核数据后再次提交</h3>',timeout:2000});}
         function itp(){$.blockUI({ message: '<h3><img src="/static/images/css/load.gif" /> 操作提交中...</h3>'});}
-
         $("[href='javascript:void(1)']").live("click",function(){
-
             $.blockUI({ message: $("#confirm"),css: {top: '20%'}});
-            $('#yes').click(function() {
+            $("#yes").unbind('click').click(function() {
                 var that = $(".focus",$("#ind_list"))[0];
                 var dList = $("td:eq(4) select",$(that));
                 var tq = parseInt(dList.find("option:selected").text().split(" ")[1]);
                 var oq = parseInt($("td:eq(9)",$(that)).text());
                 var nq = parseInt($("td:eq(3)",$(that)).text());
-                var ttq = tq;
-                if (dList.val()==$("td:eq(6)",$(that)).text()){
-                    ttq = tq+oq;
+                var sq = parseInt($("td:eq(10)",$(that)).text());
+                var ttq;
+                if ("{{ tt }}"=="退"){
+                    ttq = sq+Math.abs(oq);
                 }
-
+                else{
+                    ttq = tq;
+                    if (dList.val()==$("td:eq(6)",$(that)).text()){
+                        ttq = tq+oq;
+                    }
+                }
                 if (nq>ttq){
                     $.unblockUI();
-                    showErr("出库数不可大于当前仓库库存数")
+                    showErr("{{ tt }}库数不可大于当前库存数")
                 }
                 else if ($("td:eq(8)",$(that)).text()){
                     $.ajax({
@@ -156,15 +158,12 @@
                         beforeSend: itp,
                         success:function (data){
                             if (data.flag){$.unblockUI();
-
                                 var r_str="";
                                 var did = dList.val();
                                 $.get("/dac/?pid="+$("td:eq(1)",$(that)).text(),function(data){
                                     var tData =data.split("\n");
                                     var i;
-                                    //$("#depot_list").html("");
                                     for (i=0;i<(tData.length-1);i++){
-                                        //$("#depot_list").append("<option value="+ tData[i].split("|")[3]+">"+tData[i].split("|")[0] +" "+tData[i].split("|")[1] + "</option>")
                                         if ((i+1) ==  did){
                                             r_str += ("<option value="+ tData[i].split("|")[3]+" selected>"+tData[i].split("|")[0] +" "+tData[i].split("|")[1]+ "</option>\n");
                                         }
@@ -176,10 +175,11 @@
                                     $("td:eq(7)",$(that)).html("<a href='javascript:void(0)' class='blue'>删</a>");
                                     $(that).removeClass("focus");
                                     $("td:eq(5)",$(that)).html("<select>"+r_str+"</select>");
-
                                     $("td:eq(4)",$(that)).html($("td:eq(5) select",$(that)).find("option:selected").text());
                                     $("td:eq(6)",$(that)).html(did);
                                     $("td:eq(9)",$(that)).html(nq);
+                                    if ("{{ tt }}"=="退"){ $("td:eq(10)",$(that)).html(ttq-nq);}
+
                             });}
                             else{$.blockUI({ message:'<h3>'+data.msg+'</h3>',timeout:1000});}},
                         error:iff
@@ -199,7 +199,7 @@
             var papa = $(this).parent();
             var me = $(this);
 
-            $('#yes').click(function() {
+            $("#yes").unbind('click').click(function() {
                 $.ajax({
                     type: "POST",
                     url: "?act=del",
@@ -282,11 +282,14 @@
             return row[0];
         }
 
-        $("#name_input").autocomplete('/pac/?type=mini', {
+        if ("{{ tt }}" == "退"){var url="/pac/?shop={{ outstream.shop_id }}";}
+        else {url="/pac/?type=mini";}
+        $("#name_input").autocomplete(url, {
             minChars: 2,
             max:500,
             width: 350,
             mustMatch: true,
+            cacheLength:0,
             formatItem: formatItem,
             formatResult: formatResult
         });
@@ -294,15 +297,16 @@
          $("#name_input").result(function(event, data, formatted) {
             if (data){
                 $("#bar_input").val(data[1]);
-                $("#value_input").val(data[4]);
+                //$("#value_input").val(data[4]);
                 $("#id_input").val(data[3]);
+                if ("{{ tt }}" == "退"){$("#hquantity_input").val(data[2]);}
             }
          });
          $("#name_input").blur(function(){
              if ($("#name_input").val().length>0){
              $("#depot_input").attr("disabled",false);
              $("#depot_input").addClass("ac_init png");
-             $("#depot_input").autocomplete('/dac/?pid='+$("#id_input").val(), {
+             $("#depot_input").autocomplete("/dac/?pid="+$("#id_input").val(), {
                     minChars: 0,
                     max:100,
                     width: 287,
@@ -317,12 +321,10 @@
 
          $("#depot_input").result(function(event, data, formatted) {
             if (data){
-                $("#hquantity_input").val(data[1]);
+                if ("{{ tt }}" == "出"){$("#hquantity_input").val(data[1]);}
                 $("#did_input").val(data[3]);
             }
          });
-
-
 
         $("#add_btn").click(function(){
             if (check_pname($("#name_input").val()) && check_quantity($("#quantity_input").val()) ){
@@ -330,12 +332,12 @@
                     showErr("除位置备注外其余均为必填项");
                 }
                 else if (parseInt($("#quantity_input").val())>parseInt($("#hquantity_input").val())){
-                    showErr("出库数不可大于当前仓库库存数");
+                    showErr("{{ tt }}库数不可大于当前库存数");
                 }
                 else{
                     $.ajax({
                         type: "POST",
-                        url: "/depots/out/?act=d_add",
+                        url: "?act=d_add",
                         contentType:"text/plain",
                         dataType: "json",
                         data:"outid="+$("#outId").val()+"&pid="+$("#id_input").val()+"&quantity="+$("#quantity_input").val()+"&depot="+$("#did_input").val(),
@@ -353,7 +355,8 @@
                                 "<td style='display:none;'>"+ $("#did_input").val() +"</td>\n"+
                                 "<td><a href='javascript:void(0)' class='blue'>删</a></td>\n"+
                                 "<td style='display:none;'>"+data.id+"</td>\n"+
-                                "<td style='display:none;'>"+ $("#quantity_input").val() +"</td>\n</tr>\n";
+                                "<td style='display:none;'>"+ $("#quantity_input").val() +"</td>\n" +
+                                "<td style='display:none;'>"+data.squantity+"</td></tr>\n";
                                 $("#name_input").val("");
                                 $("#depot_input").val("");
                                 $("#did_input").val("");
@@ -389,6 +392,7 @@
             <li><a href ="/depots/remit/">汇款</a></li>
             <li><a href ="/depots/in/">入库</a></li>
             <li><a href ="/depots/out/">出库</a></li>
+            <li><a href ="/depots/re/">退库</a></li>
             <li><a href ="/category/" target="_blank">类别管理</a></li>
             <li><a href ="/depots/product/">产品细目</a></li>
         </ul>
@@ -405,7 +409,7 @@
             <input type="text" id="bar_input" style="display: none"/>
             <label for="quantity_input">数量：</label><input type="text" id="quantity_input" class="ac_input" maxlength="5" style="width:80px"/>
             <input type="text" id="hquantity_input" style="display:none"/>
-            <label for="depot_input">仓库：</label><input type="text" id="depot_input" title="请先选定出库产品" disabled="true" class="ac_input" maxlength="3" style="width:150px"/>
+            <label for="depot_input">仓库：</label><input type="text" id="depot_input" title="请先选定{{ tt }}库产品" disabled="true" class="ac_input" maxlength="3" style="width:150px"/>
             <input type="text" id="did_input" style="display: none"/>
             <button  id="add_btn" class="m_btn"><span><img src="/static/images/css/ok_small.png" class=" png"></span> 确定添加</button>
         </div>
@@ -420,7 +424,7 @@
             </div>
             <div style="float: right;">
                 <a href="?act=list" class="blue"><img src="/static/images/css/article_small.png" class="png"> 查看以往记录 </a>
-                <a href="?act=add" class="blue"><img src="/static/images/css/add_small2.png" class="png"> 新增出库提要</a>
+                <a href="?act=add" class="blue"><img src="/static/images/css/add_small2.png" class="png"> 新增{{ tt }}库提要</a>
                 <a href="javascript:history.go(-1)" class="blue"><img src="/static/images/css/back_16.png" class="png"> 返回</a>
             </div>
             </div>
@@ -437,16 +441,15 @@
                 </p>
                 </form>
 
-
             {% else %}
                 {% if outstream %}
-                    {{ outstream.code }} 经办人：{{ outstream.keeper }}、{{ outstream.staff1 }} [{{ outstream.date|date:"Y-m-d" }}]
+                    <a href="#" title="{{ outstream.note }}" class="blue">{{ outstream.code }} 经办人：{{ outstream.keeper }}、{{ outstream.staff1 }} [{{ outstream.date|date:"Y-m-d" }}]</a>
                 {% else %}
                 <img src="/static/images/css/left_small.png" class="png">
                     {% if pname %}
                         {{ pname }}
                     {% endif %}
-                    出库提要列表
+                    {{ tt }}库提要列表
                     {% if ototal > 0 %}
                         总计{{ ototal }}件
                     {% endif %}
@@ -456,10 +459,10 @@
                 {% if outstream %}
                     <p id="level" style="display: none;">{{ level }}</p>
                     <input type="text" id="outId" value="{{ outstream.id }}" style="display: none"/>
-                    {% if level < 5 %}<a href="?act=edit&id={{ outstream.id }}" class="blue"><img src="/static/images/css/edit_small.png" class="png"> 提要修改</a>{% endif%}
+                    {% if level < 5 %}<a href="?act=edit&id={{ outstream.id }}" class="blue" title="{{ outstream.log }}"><img src="/static/images/css/edit_small.png" class="png"> 提要修改</a>{% endif%}
                     <a href="javascript:history.go(-1)" class="blue"><img src="/static/images/css/back_16.png" class="png"> 返回</a>
                 {% else %}
-                    {% if level < 5 %}<a href="?act=add" class="blue"><img src="/static/images/css/add_small2.png" class="png"> 新增出库提要</a>{% endif%}
+                    {% if level < 5 %}<a href="?act=add" class="blue"><img src="/static/images/css/add_small2.png" class="png"> 新增{{ tt }}库提要</a>{% endif%}
                 {% endif %}
 
             </div>
@@ -471,7 +474,7 @@
                 <thead>
                 <tr>
                     <td>产品名称</td><td style="display:none;">pId</td><td>条形码</td><td>数量（个）</td><td>仓库</td><td style="display:none;">hDepot</td>
-                    <td style="display:none;">did</td><td>操作</td><td style="display:none;">id</td><td style="display:none;">hQuantity</td>
+                    <td style="display:none;">did</td><td>操作</td><td style="display:none;">id</td><td style="display:none;">hQuantity</td><td style="display:none;">hShopQuantity</td>
                 </tr>
                 </thead>
                 <tbody>
@@ -480,7 +483,7 @@
                     <td><a href="/depots/product/?id={{ i.product.id }}" class="blue" target="_blank">{{ i.product.name }}</a></td>
                     <td style="display:none;">{{ i.product.id }}</td>
                     <td>{{ i.product.barcode }}</td>
-                    <td>{{ i.quantity }}</td>
+                    <td>{{ i.quantity|cut:"-" }}</td>
                     <td>{{ i.depot.name }}</td>
                     <td style="display:none;"></td>
                     <td style="display:none;">{{ i.depot.id }}</td>
@@ -491,7 +494,8 @@
                         {% endif %}
                     </td>
                     <td style="display:none;">{{ i.id }}</td>
-                    <td style="display:none;">{{ i.quantity }}</td>
+                    <td style="display:none;">{{ i.quantity|cut:"-" }}</td>
+                    <td style="display:none;">{{ i.squantity }}</td>
                     </tr>
                 {% endfor %}
                 </tbody>
@@ -507,9 +511,9 @@
                 {% for i in out_list.object_list %}
                     <tr>
                     <td>{{ forloop.counter }}</td>
-                    <td><a href="?act=detail&id={{ i.id }}" class="blue">{{ i.code }}</a></td>
+                    <td><a href="?act=detail&id={{ i.id }}" class="blue" title="{{ i.log }}">{{ i.code }}</a></td>
                     <td>{{ i.shop }}</td>
-                    <td>{% if i.pq %}{{ i.pq }}件: {% endif %}{{ i.total.0 }}件{% if level < 5 %} / ￥{{ i.total.1 }}{% endif %}</td>
+                    <td>{% if i.pq %}{{ i.pq|cut:"-" }}件: {% endif %}{{ i.total.0|cut:"-" }}件{% if level < 5 %} / ￥{{ i.total.1|cut:"-" }}{% endif %}</td>
                     <td><a href="/staff/?id={{ i.keeper_id }}" class="blue">{{ i.keeper.name }}</a></td>
                     <td><a href="/staff/?id={{ i.staff1_id }}" class="blue">{{ i.staff1 }}</a>
                     </td>
@@ -521,7 +525,7 @@
 
                     </td>
                     <td>{% if level < 5 %}
-                        <a href="?act=edit&id={{ i.id }}" class="blue" {% if i.note %} title="备注：{{ i.note }}"{% endif %}>提要改</a>
+                        <a href="?act=edit&id={{ i.id }}" class="blue" title="{{ i.note }}">提要改</a>
                         {% if not i.hidden %}
                         <a href="javascript:void(2)" name="{{ i.id }}" class="blue">删</a>
                         {% endif %}/

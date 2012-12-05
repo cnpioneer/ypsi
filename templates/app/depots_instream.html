@@ -67,7 +67,7 @@
 
         $("[href='javascript:void(0)']").live("click",function(){
             $.blockUI({ message: $("#confirm"),css: {top: '20%'}});
-            $('#yes').click(function() {
+            $("#yes").unbind('click').click(function() {
                 var that = $(".focus",$("#ind_list"))[0];
                 if ($("td:eq(9)",$(that)).text()){
                     $.ajax({
@@ -79,9 +79,11 @@
                         timeout:10000,
                         beforeSend: function () {
                             $.blockUI({ message: '<h3><img src="/static/images/css/load.gif" /> 操作提交中...</h3>'});},
-                        success:function() {
-                            $(that).detach();
-                            $.blockUI({ message:'<h3>操作完成</h3>',timeout:1500});
+                        success:function(data) {
+                            if (data == "True"){
+                                $(that).detach();
+                                $.blockUI({ message:'<h3>操作完成</h3>',timeout:1500});}
+                            else{$.blockUI({ message:'<h3>无法删除：因删除后该产品出库总数将大于入库总数</h3>',timeout:1500});}
                         },
                         error:function(){$.blockUI({ message: '<h3>操作失败,请复核数据后再次提交</h3>',timeout:1500});}
 
@@ -102,7 +104,7 @@
 
         $("[href='javascript:void(1)']").live("click",function(){
             $.blockUI({ message: $("#confirm"),css: {top: '20%'}});
-            $('#yes').click(function() {
+            $("#yes").unbind('click').click(function() {
                 var that = $(".focus",$("#ind_list"))[0];
                 if ($("td:eq(9)",$(that)).text()){
                     $.ajax({
@@ -120,7 +122,7 @@
                         error:iff
 
                 });}
-                else{showErr("参数不足");}
+                else{showErr("参数不足或重复提交");}
 
             });
             $('#no').click(function() {
@@ -133,7 +135,7 @@
             var id = this.name;
             var papa = $(this).parent();
             var me = $(this);
-            $('#yes').click(function() {
+            $("#yes").unbind('click').click(function() {
                 $.ajax({
                     type: "POST",
                     url: "/depots/in/?act=del",
@@ -334,6 +336,7 @@
             <li><a href ="/depots/remit/">汇款</a></li>
             <li><a href ="/depots/in/">入库</a></li>
             <li><a href ="/depots/out/">出库</a></li>
+            <li><a href ="/depots/re/">退库</a></li>
             <li><a href ="/category/" target="_blank">类别管理</a></li>
             <li><a href ="/depots/product/">产品细目</a></li>
         </ul>
@@ -385,7 +388,7 @@
 
             {% else %}
                 {% if instream %}
-                    {{ instream.code }} 经办人：{{ instream.keeper }}、{{ instream.staff1 }} [{{ instream.date|date:"Y-m-d" }}]
+                    <a href="javascript:void(#)" title="{{ instream.note }}" class="blue">{{ instream.code }} 经办人：{{ instream.keeper }}、{{ instream.staff1 }} [{{ instream.date|date:"Y-m-d" }}]</a>
                 {% else %}
                 <img src="/static/images/css/right_small.png" class="png">
                     {% if pname %}
@@ -398,12 +401,11 @@
             <div style="float: right;">共{{ rows }}条记录 {{ ins_list.number }}/{{ ins_list.paginator.num_pages }}页
                 {% if instream %}
                     <input type="text" id="insId" value="{{ instream.id }}" style="display: none"/>
-                    <a href="?act=edit&id={{ instream.id }}" class="blue"><img src="/static/images/css/edit_small.png" class="png"> 提要修改</a>
+                    <a href="?act=edit&id={{ instream.id }}" class="blue" title="{{ instream.log }}"><img src="/static/images/css/edit_small.png" class="png"> 提要修改</a>
                     <a href="/depots/in/" class="blue"><img src="/static/images/css/back_16.png" class="png"> 返回</a>
                 {% else %}
                     <a href="?act=add" class="blue"><img src="/static/images/css/add_small2.png" class="png"> 新增入库提要</a>
                 {% endif %}
-
             </div>
         </div>
         <div >
@@ -448,7 +450,7 @@
                 {% for i in ins_list.object_list %}
                     <tr>
                     <td>{{ forloop.counter }}</td>
-                    <td><a href="?act=detail&id={{ i.id }}" class="blue">{{ i.code }}</a></td>
+                    <td><a href="?act=detail&id={{ i.id }}" class="blue" title="{{ i.log }}">{{ i.code }}</a></td>
                     <td>{{ i.get_supplier_display }}</td>
                     <td>{% if i.pq %}
                         {{ i.pq }}件: {{ i.i_str.1 }}件
@@ -468,7 +470,7 @@
                         {% endif %}
                     </td>
                     <td>
-                        <a href="?act=edit&id={{ i.id }}" class="blue" {% if i.note %}title="备注：{{ i.note }}"{% endif %}>提要改</a>
+                        <a href="?act=edit&id={{ i.id }}" class="blue" title="{{ i.note }}">提要改</a>
                         {% if not i.hidden %}
                         <a href="javascript:void(2)" name="{{ i.id }}" class="blue">删</a>
                         {% endif %}/

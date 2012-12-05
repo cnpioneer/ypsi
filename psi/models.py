@@ -6,7 +6,6 @@ from django.db.models import Sum
 from django.db import models,connection
 from django.contrib.auth.models import User
 
-
 sp_choices =((1, '罗莱'),(2, '优家'),(3,'宝缦'),(4,'其他'))#(99,'退库')
 
 class Posts(models.Model):
@@ -170,6 +169,7 @@ class InStream(models.Model): #出入库分离
     staff1 = models.ForeignKey(Staff,related_name='in_sells_1_set',help_text="收货人一")
     staff2 = models.ForeignKey(Staff,related_name='in_sells_2_set',blank=True,null=True,help_text="收货人二")
     note = models.CharField(max_length=100,blank=True,null=True,help_text="备注")
+    log = models.TextField(max_length=1500,blank=True,null=True,help_text="备注")
     hidden = models.BooleanField(default=False,help_text="删除标记")
     def get_total_amount(self):#自定义属性
         if len(InDetail.objects.filter(inid=1))>0:
@@ -194,7 +194,7 @@ class InDetail(models.Model):
         return self.quantity*self.value
     amount = property(_get_amount)
     def __unicode__(self):
-        return (u"%d:%s %d 套，小计 %s 元") %(self.inid_id,self.product.name,self.quantity,self.amount)#此处使用了%s而非%d提高Decimal类型数据精度
+        return (u"%d:%s 单价 %d 共 %d 套，小计 %s 元") %(self.inid_id,self.product.name,self.value,self.quantity,self.amount)#此处使用了%s而非%d提高Decimal类型数据精度
     class Meta:
         verbose_name_plural = ('入库详单')
 
@@ -206,7 +206,9 @@ class OutStream(models.Model):
     staff2 = models.ForeignKey(Staff,related_name='out_sells_2_set',blank=True,null=True,help_text="提货人二")
     shop = models.ForeignKey(Shop,help_text="提货店铺")
     hidden = models.BooleanField(default=False,help_text="删除标记")
+    returned = models.BooleanField(default=False,help_text="退库标记")
     note = models.CharField(max_length=100,blank=True,null=True,help_text="备注")
+    log = models.TextField(max_length=1500,blank=True,null=True,help_text="备注")
     def get_total_amount(self): #自定义属性
         if len(OutDetail.objects.filter(outid = self.id))>0:
             cursor = connection.cursor()

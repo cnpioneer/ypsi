@@ -1,6 +1,5 @@
 # -*- coding: UTF-8 -*-
 import codecs
-import json
 from django.contrib.auth import authenticate, login, logout
 from django.http import HttpResponseRedirect, HttpResponse
 from django.shortcuts import render_to_response, get_object_or_404
@@ -17,22 +16,26 @@ from django.db.models import Q,Sum
 from django.utils import simplejson
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
+from django.db.models.signals import post_save
 
 def product_autocomplete(request):
     staff = request.user.get_profile()
+    shopId = request.GET.get("shop","")
     q_str = "".join(request.GET.get('q',"").split())
     l_str = "".join(request.GET.get('limit',"").split())
     r_str = []
     pId = "".join(request.GET.get('pid',"").split())
+    rId = "".join(request.GET.get('rid',"").split())
     type = "".join(request.GET.get('type',"").split())
     if pId:
+        if shopId:
+            staff.shop_id=shopId
         if len(OutStream.objects.filter(shop=staff.shop_id).exclude(hidden=1))>0:#当前店铺是否存在该商品出库记录
             cursor = connection.cursor()
             cursor.execute ("select oQuantity-ifNull(sQuantity,0) as nQuantity from \
-            (select sum(quantity) as oQuantity,pid from PSI_OutDETAIL,psi_outStream  join \
-            (select id as pid from psi_products) on pid = product_id where pid=%s and outId_id=psi_outStream.id and psi_outstream.hidden=0 and shop_id=%s group by product_id ) \
+            (select sum(quantity) as oQuantity,product_id as pid from PSI_OutDETAIL,psi_outStream where product_id=%s and outId_id=psi_outStream.id and psi_outstream.hidden=0 and shop_id=%s group by product_id ) \
             left join \
-            (select psi_sellOrderDetail.product_id as sPid,sum(psi_sellOrderDetail.quantity) as sQuantity from psi_sellOrderDetail,psi_sellOrder where hidden=0 and oid_id=psi_sellOrder.id and shop_id=%s group by psi_sellOrderDetail.product_id) \
+            (select psi_sellOrderDetail.product_id as sPid,sum(psi_sellOrderDetail.quantity) as sQuantity from psi_sellOrderDetail,psi_sellOrder where hidden=0 and oid_id=psi_sellOrder.id and shop_id=%s group by product_id) \
             on  pid=sPid order by nQuantity desc;",[pId,staff.shop_id,staff.shop_id])
             tags = cursor.fetchone()
             cursor.close()
@@ -44,6 +47,16 @@ def product_autocomplete(request):
         else:
             r_str2 = 0
         return HttpResponse(str(r_str2))
+
+    elif rId:
+        cursor = connection.cursor()
+        cursor.execute("select name,sum(ifnull(quantity,0))-ifnull(stq,0),psi_outstream.shop_id from psi_outstream,psi_outdetail,psi_shop left join "
+                       "(select psi_sellorder.shop_id as ssid, sum(ifnull(quantity,0)) as stq from psi_sellorderdetail,psi_sellorder where product_id=%s and psi_sellorder.hidden=0 and oid_id=psi_sellorder.id  group by psi_sellorder.shop_id) "
+                       "on psi_outstream.shop_id=ssid where  psi_outdetail.product_id=%s and psi_outstream.hidden=0 and outid_id = psi_outstream.id and psi_outstream.shop_id=psi_shop.id group by psi_outstream.shop_id",[rId,rId])
+        tags = cursor.fetchall()
+        cursor.close()
+        for tag in tags:
+            r_str.append(u"%s|%s|不明|%s\n"%(tag[0],tag[1],tag[2]))
 
     elif type == "mini":
         p1 = Products.objects.filter(Q (name__icontains=q_str) | Q (barcode__icontains=q_str),hidden=0)[:100]
@@ -58,8 +71,8 @@ def product_autocomplete(request):
     else:
         if l_str:
             l_str = "limit "+l_str+" ;"
-        if staff.level>4:#经理级别以下不可跨店销售
             q_str = "%%%s%%"%q_str
+        if staff.level>4:#经理级别以下不可跨店销售
             if len(OutStream.objects.filter(shop=staff.shop_id))>0:#当前店铺是否存在该商品出库记录
                 cursor = connection.cursor()
                 cursor.execute ("select name,barcode,oQuantity-ifNull(sQuantity,0) as nQuantity,ifNull(price,''),pid,ifNull(size,0) from "
@@ -75,6 +88,19 @@ def product_autocomplete(request):
 
             else:
                 r_str = ("无相应出库记录||||")
+        elif shopId:
+            if len(OutStream.objects.filter(shop=shopId))>0:#当前店铺是否存在该商品出库记录
+                cursor = connection.cursor()
+                cursor.execute ("select name,barcode,pid,oQuantity-ifNull(sQuantity,0) as nQuantity from \
+                            (select name,barcode,pid,sum(quantity) as oQuantity,pid from PSI_OutDETAIL,psi_outStream  join \
+                            (select id as pid,name,barcode from psi_products where name like %s or barcode like %s) on pid = product_id where outId_id=psi_outStream.id and psi_outstream.hidden=0 and shop_id=%s group by product_id ) \
+                            left join \
+                            (select psi_sellOrderDetail.product_id as sPid,sum(psi_sellOrderDetail.quantity) as sQuantity from psi_sellOrderDetail,psi_sellOrder where hidden=0 and oid_id=psi_sellOrder.id and shop_id=%s group by psi_sellOrderDetail.product_id) \
+                            on pid=sPid where nQuantity>0 order by nQuantity desc;",[q_str,q_str,shopId,shopId])
+                tags = cursor.fetchall()
+                cursor.close()
+                for tag in tags:
+                    r_str.append("%s|%s|%s|%s|0\n"%(tag[0],tag[1],tag[3],tag[2]))
         else:
             r_str = ("您并非销售人员不予查询||||")
 
@@ -90,17 +116,25 @@ def customer_search(request):
              r_str.append("%s\n"%tag)
     return HttpResponse(r_str)
 
-
 def depot_autocomplete(request):
     q_str = "".join(request.GET.get('pid',"").split())
     r_str=[]
     depots = Depot.objects.filter(hidden=0)
     cursor = connection.cursor()
-    cursor.execute ("select name,ifnull(tq,0) from psi_depot left join "
-                    "(select psi_indetail.depot_id as idid,sum(ifnull(psi_indetail.quantity,0))-(ifnull(oq,0)) as tq from psi_indetail,psi_instream left join "
-                    "(select sum(psi_outdetail.quantity) as oq,psi_outdetail.product_id,psi_outdetail.depot_id as odid from psi_outdetail,psi_outstream where psi_outdetail.product_id=%s and outid_id=psi_outstream.id and psi_outstream.hidden=0 group by psi_outdetail.depot_id) "
-                    "on idid=odid where psi_indetail.product_id=%s and inid_id=psi_instream.id and psi_instream.hidden=0 group by psi_indetail.depot_id) "
-                    "on idid=psi_depot.id where psi_depot.hidden=0 order by id limit 100;",[q_str,q_str])
+    cursor.execute ("select name,ifnull(tq,0)-ifnull(oq,0) as ttq from psi_depot left join \
+    ( \
+    select sum(ifnull(psi_indetail.quantity,0))as tq ,psi_indetail.depot_id as idid \
+    from psi_indetail,psi_instream \
+    where psi_indetail.product_id=%s and inid_id=psi_instream.id and psi_instream.hidden=0 \
+    group by psi_indetail.depot_id \
+    ) on psi_depot.id=idid \
+    left join \
+    ( \
+    select sum(psi_outdetail.quantity) as oq,psi_outdetail.depot_id as odid \
+    from psi_outdetail,psi_outstream \
+    where psi_outdetail.product_id=%s and outid_id=psi_outstream.id and psi_outstream.hidden=0 \
+    group by psi_outdetail.depot_id \
+    ) on psi_depot.id=odid;",[q_str,q_str])
     tags = cursor.fetchall()
     cursor.close()
     '''
@@ -114,17 +148,15 @@ def depot_autocomplete(request):
 
 def depot_pSum(d_id,p_id):
     cursor = connection.cursor()
-    cursor.execute ("select ifnull(tq,0) from psi_depot join "
-                    "(select psi_indetail.depot_id as idid,sum(ifnull(psi_indetail.quantity,0))-(ifnull(oq,0)) as tq from psi_indetail,psi_instream left join "
-                    "(select sum(psi_outdetail.quantity) as oq,psi_outdetail.product_id,psi_outdetail.depot_id as odid from psi_outdetail,psi_outstream where psi_outdetail.product_id=%s and psi_outdetail.depot_id=%s and outid_id=psi_outstream.id and hidden=0 group by psi_outdetail.depot_id) "
-                    "on idid=odid where idid=%s and psi_indetail.product_id=%s and inid_id=psi_instream.id and hidden=0 group by psi_indetail.depot_id) "
-                    "on idid=psi_depot.id where psi_depot.hidden=0 order by id ",[p_id,d_id,d_id,p_id])
+    cursor.execute ("select ifnull(\
+        (\
+        select sum(ifnull(psi_indetail.quantity,0))-(ifnull(oq,0)) as tq from psi_indetail,psi_instream left join \
+        (select sum(psi_outdetail.quantity) as oq,psi_outdetail.product_id,psi_outdetail.depot_id as odid from psi_outdetail,psi_outstream \
+        where psi_outdetail.product_id=%s and psi_outdetail.depot_id=%s and outid_id=psi_outstream.id and hidden=0 group by psi_outdetail.depot_id) \
+        on psi_indetail.depot_id=psi_indetail.depot_id where psi_indetail.product_id=%s and psi_indetail.depot_id=%s and inid_id=psi_instream.id and hidden=0  group by psi_indetail.depot_id \
+        ),0) as tq ",[p_id,d_id,p_id,d_id])
     tq = cursor.fetchone()[0]
     return tq
-
-
-
-
 
 def ypsi_staff_list(request):
     shopId = get_object_or_404(Shop, id=request.user.get_profile().shop_id)
@@ -133,11 +165,10 @@ def ypsi_staff_list(request):
     tags = Staff.objects.filter(shop=shopId).exclude(level=0).filter(name__icontains=q_str)
     for tag in tags:
         r_str.append("%s|%s\n"%(tag,tag.id))
-    #print q_str
     return HttpResponse(r_str)
 
 def user_login(request):
-    #request.session["login_count"] = request.session.get('login_count', 0)
+    request.session.set_expiry(0) #关闭浏览器session失效
     act = request.GET.get("act","")
     err_count = request.session.get("err_count",0)
     page_title = "YPSI 系统登录"
@@ -154,7 +185,13 @@ def user_login(request):
                 if user is not None:
                     # 转到成功页面
                     login(request, user)
-                    return HttpResponseRedirect('/')
+                    #request.session["userid"] = user.id 与session["_auth_user_id"]重复
+                    #request.session["username"] = user.get_profile().name
+                    #request.session["level"] = user.get_profile().level
+                    next_path = request.session.get("next_path","")
+                    if len(next_path) < 1:
+                        next_path = "/"
+                    return HttpResponseRedirect('%s'%next_path)
                 else:
                     #request.session["login_count"] +=1
                     err_count += 1
@@ -166,6 +203,7 @@ def user_login(request):
 
     elif act == "logout":
         logout(request)
+        request.session.flush()
         return HttpResponseRedirect('/accounts/login/?act=out')
     elif act == "stop":
         page_title = "错误次数过多"
@@ -176,6 +214,7 @@ def user_login(request):
         elif act == "err":
             page_title="用户名或密码错误"
         form = YLogin()
+        request.session["next_path"] = request.GET.get("next","")
     return render_to_response('accounts/login.html',locals())
 
 @login_required
@@ -192,7 +231,6 @@ def ypsi_index(request):
         days = int(days)
     except :
         page_errs=("请输入正确参数")
-    #print isinstance(int(days),int)
     if user.level > 5 and wmode <> "1" and days > 60 :
         page_errs=("普通模式下可统计天数上限为60日 <a href='?w=1&days=120'><span><img src='/static/images/css/chart16.png'/> 切换宽屏模式查看更多</span></a> 或 <a href='javascript:history.go(-1)'>返回上一页</a>")
     elif user.level > 5 and wmode == "1" and days > 120 :
@@ -704,9 +742,20 @@ def ypsi_depots_charts(request):
                            "(select psi_sellorder.shop_id as ssid, sum(quantity) as sq from psi_sellorder,psi_sellorderdetail where psi_sellorder.hidden=0 and oid_id = psi_sellorder.id group by shop_id) "
                            "on psi_outstream.shop_id=ssid where psi_outstream.hidden=0 and psi_outstream.id = outid_id and psi_outstream.shop_id=psi_shop.id group by shop_id  ;")
         elif qStr == "pdp" and pid:
-            cursor.execute("select psi_depot.name,sum(ifnull(quantity,0))-ifnull(otq,0) as tq from psi_indetail,psi_depot left join"
-                           "(select product_id as pid,depot_id as opid,sum(ifnull(psi_outdetail.quantity,0)) as otq from psi_outdetail,psi_outstream where outid_id=psi_outstream.id and psi_outstream.hidden=0 and product_id=%s group by depot_id)"
-                           "on psi_indetail.depot_id = opid  where psi_indetail.product_id=%s and depot_id=psi_depot.id group by depot_id",[pid,pid])
+            cursor.execute ("select name,ifnull(tq,0)-ifnull(oq,0) as ttq from psi_depot left join \
+                            ( \
+                            select sum(ifnull(psi_indetail.quantity,0))as tq ,psi_indetail.depot_id as idid \
+                            from psi_indetail,psi_instream \
+                            where psi_indetail.product_id=%s and inid_id=psi_instream.id and psi_instream.hidden=0 \
+                            group by psi_indetail.depot_id \
+                            ) on psi_depot.id=idid \
+                            left join \
+                            ( \
+                            select sum(psi_outdetail.quantity) as oq,psi_outdetail.depot_id as odid \
+                            from psi_outdetail,psi_outstream \
+                            where psi_outdetail.product_id=%s and outid_id=psi_outstream.id and psi_outstream.hidden=0 \
+                            group by psi_outdetail.depot_id \
+                            ) on psi_depot.id=odid;",[pid,pid])
         elif qStr == "psp" and pid:
             cursor.execute("select name,sum(ifnull(quantity,0))-ifnull(stq,0) from psi_outstream,psi_outdetail,psi_shop left join "
                            "(select psi_sellorder.shop_id as ssid, sum(ifnull(quantity,0)) as stq from psi_sellorderdetail,psi_sellorder where product_id=%s and psi_sellorder.hidden=0 and oid_id=psi_sellorder.id  group by psi_sellorder.shop_id) "
@@ -719,12 +768,12 @@ def ypsi_depots_charts(request):
         r_str = cursor.fetchall()
         cursor.close()
         data = []
-        dlist = []
+        #dlist = []
         ttq=0
-        
         for index,r in enumerate(r_str):
-            data.append([r[0],r[1]])
-            ttq +=r[1]
+            if r[1] <> 0:
+                data.append([r[0],r[1]])
+                ttq +=r[1]
         return HttpResponse(simplejson.dumps({"data":data,"ttq":ttq},ensure_ascii=False), mimetype="text/plain")
 
 
@@ -744,7 +793,6 @@ def ypsi_depots_product(request):
         return render_to_response('app/depots_product.html',{"page_title":page_title,"s_list":s_list,"sid":sid,"level":request.user.get_profile().level,"pd":pd,"tq":tq})
     else:
         return render_to_response('app/depots_product.html',{"page_title":page_title,"s_list":s_list,"sid":0,"level":request.user.get_profile().level})
-
 
 def ypsi_depots_in(request):
     act = request.GET.get("act","list")
@@ -768,22 +816,24 @@ def ypsi_depots_in(request):
     elif act == "edit":
         page_title = "修改入库提要信息"
         ins = get_object_or_404(InStream, id=iId)
+        user = request.user.get_profile().id
         if request.POST:
             form = yforms.InStream(request.POST)
             if form.is_valid():
                 fc = form.cleaned_data
-                ins.code=fc["code"]
-                ins.supplier=fc["supplier"]
-                ins.date=fc["date"]
-                ins.keeper=fc["keeper"]
-                ins.staff1=fc["staff1"]
-                ins.hidden=fc["hidden"]
-                ins.note=fc["note"]
-                ins.save()
+                if (ins.code<>fc["code"]) or (ins.supplier<>fc["supplier"]) or (ins.date<>fc["date"]) or (ins.keeper<>fc["keeper"]) or (ins.staff1<>fc["staff1"]) or (ins.hidden<>fc["hidden"]) or (ins.note<>fc["note"]) :
+                    ins.code=fc["code"]
+                    ins.supplier=fc["supplier"]
+                    ins.date=fc["date"]
+                    ins.keeper=fc["keeper"]
+                    ins.staff1=fc["staff1"]
+                    ins.hidden=fc["hidden"]
+                    ins.note=fc["note"]
+                    ins.save()
                 return HttpResponseRedirect("?act=edited")
             
         else:
-            form = yforms.InStream({"code":ins.code,"supplier":ins.supplier,"date":ins.date,"keeper":ins.keeper_id,"staff1":ins.staff1_id,"hidden":ins.hidden,"note":ins.note})
+            form = yforms.InStream({"code":ins.code,"supplier":ins.supplier,"date":ins.date,"keeper":user,"staff1":ins.staff1_id,"hidden":ins.hidden,"note":ins.note,"log":ins.log})
         return render_to_response('app/depots_instream.html',{"page_title":page_title,"form":form,"act":"edit","iId":iId})
 
     elif act == "del":
@@ -828,11 +878,19 @@ def ypsi_depots_in(request):
     elif act=="d_del":
         idId = request.POST.get("id","")
         ind = get_object_or_404(InDetail, id=idId)
-        ind.quantity=0
-        ind.save()
-        return HttpResponse("done", mimetype="text/plain")
+        flag = True
+        if ind.product.p_str[3] - ind.quantity >ind.product.p_str[4]:
+            ins = ind.inid
+            if ins.log is None:
+        	    ins.log = ""
+            ins.log = u"%s %s 删除 产品：%s\n原:%s套 单价%s 仓库%s\n%s\n"\
+            %(datetime.date.today(),request.user.get_profile().name,ind.product.name,ind.quantity,ind.value,ind.depot.name,31*'-') + ins.log
+            ins.save()
+            ind.delete()
+        else:
+            flag = False
+        return HttpResponse(flag, mimetype="text/plain")
     elif act =="d_edit":
-
         idId = request.POST.get("id","")
         ind = get_object_or_404(InDetail, id=idId)
         depot = get_object_or_404(Depot,id=request.POST.get("depot",""))
@@ -850,25 +908,32 @@ def ypsi_depots_in(request):
             flag = False
             msg.append("产品数量错误")
         if flag:
-
             if ind.quantity-int(quantity) > ind.product.p_str[1]:
                 flag=False
                 msg.append("修改后入库总数不可小于出库总数")
-                
-            d_in= InDetail.objects.filter(product=ind.product,depot=depot,inid__in=InStream.objects.filter(hidden=0)).extra(select={'t_in_quantity':'sum(quantity)'}).order_by("-id")[0].t_in_quantity
+            d_in = InDetail.objects.filter(product=ind.product,depot=depot,inid__in=InStream.objects.filter(hidden=0)).aggregate(Sum('quantity'))["quantity__sum"]
             d_out = OutDetail.objects.filter(product=ind.product,depot=depot,outid__in=OutStream.objects.filter(hidden=0)).aggregate(Sum('quantity'))['quantity__sum']
             if d_out is None:
                 d_out = 0
+            if d_in is None:
+                d_in = 0
             if (ind.quantity-int(quantity)) > (d_in-d_out):
                 flag=False
                 msg.append("修改后当前仓库入库总数不可小于出库总数,最大可修改值为%s"%(ind.quantity-(d_in-d_out)))
 
         if flag:
-            ind.quantity=quantity
-            ind.value = value
-            ind.depot = depot
-            ind.depotdetail = depotdetail
-            ind.save()
+            if (ind.quantity <> quantity) or (ind.value <> value) or (ind.depot <> depot) or (ind.depotdetail <> depotdetail):
+                ins = ind.inid
+                if ins.log is None:
+                    ins.log = ""
+                ins.log = u"%s %s 修改 产品：%s\n原:%s套 单价%s 仓库%s\n新:%s套 单价%s 仓库%s\n%s\n"\
+                %(datetime.date.today(),request.user.get_profile().name,ind.product.name,ind.quantity,ind.value,ind.depot.name,quantity,value,depot.name,31*'-') + ins.log
+                ind.quantity = quantity
+                ind.value = value
+                ind.depot = depot
+                ind.depotdetail = depotdetail
+                ind.save()
+                ins.save()
         return HttpResponse(simplejson.dumps({"flag":flag,"msg":"</br>".join(msg)},ensure_ascii=False), mimetype="text/plain")
 
     else:
@@ -913,20 +978,26 @@ def ypsi_depots_in(request):
 
         return render_to_response('app/depots_instream.html',{"page_title":page_title,"ins_list":ins_list,"page_range":page_range,"rows":len(ins),"instream":instream,"level":level,"url":url,"pname":pname})
 
-def ypsi_depots_out(request):
+def ypsi_depots_out(request,direction):
     act = request.GET.get("act","list")
     oId = request.GET.get("id","")
     level = request.user.get_profile().level
-    page_title = "出库单列表"
+    if direction == "re":
+        tt = "退"
+        rFlag = True
+    else:
+        tt = "出"
+        rFlag = False
+    page_title = "%s库单列表"%tt
     pname = ""
     ototal = 0
     if act == "add":
-        page_title = "新增出库提要信息"
+        page_title = "新增%s库提要信息"%tt
         if request.POST:
             form = yforms.OutStream(request.POST)
             if form.is_valid():
                 fc = form.cleaned_data
-                outstream = OutStream(code=fc["code"],shop=fc["supplier"],date=fc["date"],keeper=fc["keeper"],staff1=fc["staff1"],note=fc["note"])
+                outstream = OutStream(code=fc["code"],shop=fc["supplier"],date=fc["date"],keeper=fc["keeper"],staff1=fc["staff1"],note=fc["note"],returned=rFlag)
                 outstream.save()
                 if fc["instream"]:
                     inlist =InDetail.objects.filter(inid=fc["instream"])
@@ -934,33 +1005,31 @@ def ypsi_depots_out(request):
                         OutDetail(outid=outstream,product=i.product,quantity=i.quantity,depot=i.depot).save()
                 return HttpResponseRedirect("?act=added")
             else:
-                return render_to_response('app/depots_outstream.html',{"page_title":"新增信息错误","form":form,"act":"add"})
+                return render_to_response('app/depots_outstream.html',{"page_title":"新增信息错误","form":form,"act":"add","tt":tt})
 
         else:
             form = yforms.OutStream()
-            return render_to_response('app/depots_outstream.html',{"page_title":page_title,"form":form,"act":"add"})
-
-        #return render_to_response('app/depots_outstream.html',{"page_title":"新增出库提要信息","form":yforms.OutStream()})
+            return render_to_response('app/depots_outstream.html',{"page_title":page_title,"form":form,"act":"add","tt":tt})
 
     elif act == "edit":
         out = get_object_or_404(OutStream, id=oId)
-
         if request.POST:
             form = yforms.OutStream(request.POST)
             if form.is_valid():
                 fc = form.cleaned_data
-                out.code=fc["code"]
-                out.shop=fc["supplier"]
-                out.date=fc["date"]
-                out.keeper=fc["keeper"]
-                out.staff1=fc["staff1"]
-                out.hidden=fc["hidden"]
-                out.note=fc["note"]
-                out.save()
+                if (out.code<>fc["code"]) or (out.shop<>fc["supplier"]) or (out.date<>fc["date"]) or (out.keeper<>fc["keeper"]) or (out.staff1<>fc["staff1"]) or (out.hidden<>fc["hidden"]) or (out.note<>fc["note"]) :
+                    out.code=fc["code"]
+                    out.shop=fc["supplier"]
+                    out.date=fc["date"]
+                    out.keeper=fc["keeper"]
+                    out.staff1=fc["staff1"]
+                    out.hidden=fc["hidden"]
+                    out.note=fc["note"]
+                    out.save()
                 return HttpResponseRedirect("?act=edited")
         else:
-            form = yforms.OutStream({"code":out.code,"supplier":out.shop.id,"date":out.date,"keeper":out.keeper_id,"staff1":out.staff1_id,"hidden":out.hidden,"note":out.note})
-            page_title = "出库提要信息"
+            form = yforms.OutStream({"code":out.code,"supplier":out.shop.id,"date":out.date,"keeper":out.keeper_id,"staff1":out.staff1_id,"hidden":out.hidden,"note":out.note,"log":out.log})
+            page_title = "%s库提要信息"%tt
 
         return render_to_response('app/depots_outstream.html',{"page_title":page_title,"form":form,"oId":oId})
 
@@ -978,62 +1047,94 @@ def ypsi_depots_out(request):
         depot = get_object_or_404(Depot, id=request.POST.get("depot",""))
         out = get_object_or_404(OutStream, id=request.POST.get("outid",""))
         quantity = request.POST.get("quantity","")
-
         msg = []
         flag = True
         odid = ""
+        r_str2 = 0
         regQ = re.match(ur"^[1-9][0-9]*$",quantity)
         if regQ is None:
             flag = False
             msg.append("产品数量错误")
         if flag:
+            if rFlag:
+                quantity = -int(quantity)
             outd = OutDetail(outid=out,product=product,quantity=quantity,depot=depot)
             outd.save()
             odid = outd.id
-        return HttpResponse(simplejson.dumps({"flag":flag,"id":odid,"msg":msg},ensure_ascii=False), mimetype="text/plain")
+            productId = outd.product_id
+            shopId = outd.outid.shop_id
+            cursor = connection.cursor()
+            cursor.execute("select oQuantity-ifNull(sQuantity,0) as nQuantity from \
+            (select sum(quantity) as oQuantity,product_id as pid from PSI_OutDETAIL,psi_outStream  \
+             where outId_id=psi_outStream.id and psi_outstream.hidden=0 and product_id=%s and shop_id=%s group by product_id ) \
+            left join \
+            (select psi_sellOrderDetail.product_id as sPid,sum(psi_sellOrderDetail.quantity) as sQuantity from psi_sellOrderDetail,psi_sellOrder \
+            where product_id=%s and hidden=0 and oid_id=psi_sellOrder.id and shop_id=%s group by psi_sellOrderDetail.product_id) \
+            on pid=sPid order by nQuantity desc",[productId,shopId,productId,shopId])
+            tags = cursor.fetchone()
+            cursor.close()
+            if tags:
+                r_str2 = tags[0]
+        return HttpResponse(simplejson.dumps({"flag":flag,"id":odid,"squantity":r_str2,"msg":msg},ensure_ascii=False), mimetype="text/plain")
 
     elif act =="d_edit":
-
         oId = request.POST.get("id","")
         outd = get_object_or_404(OutDetail, id=oId)
         pt =get_object_or_404(Products,id=request.POST.get("pid",""))
         depot = get_object_or_404(Depot,id=request.POST.get("depot",""))
-        psum = depot_pSum(request.POST.get("depot",""),outd.product_id)
+        psum = depot_pSum(depot.id,outd.product_id)
         quantity = request.POST.get("quantity","")
         msg = []
         flag = True
         regQ = re.match(ur"^[1-9][0-9]*$",quantity)
-        
+        if rFlag:
+            quantity = -int(quantity)
         if regQ is None:
             flag = False
             msg.append("产品数量错误")
         elif int(quantity)>(int(psum)+outd.quantity):
-            #print depot_pSum(2,5)
             flag = False
             msg.append("出库数不可大于此商品当前仓库库存数")
         elif len(OutDetail.objects.exclude(id=oId).filter(outid=outd.outid,product=pt,depot=depot,quantity__gt=0))>0:
             flag = False
             msg.append("当前出库单中已包含同一仓库同一产品出库记录")
         if flag:
-            outd.quantity=quantity
-            outd.depot = depot
-            outd.save()
+            if (outd.quantity <> quantity) or (outd.depot <> depot) :
+                outs = outd.outid
+                if outs.log is None:
+                    outs.log = ""
+                outs.log = u"%s %s 修改 产品：%s\n原:%s套 仓库%s\n新:%s套 仓库%s\n%s\n"\
+                %(datetime.date.today(),request.user.get_profile().name,outd.product.name,outd.quantity,outd.depot.name,quantity,depot.name,31*"-") + outs.log
+                outd.quantity=quantity
+                outd.depot = depot
+                outd.save()
+                outs.save()
         return HttpResponse(simplejson.dumps({"flag":flag,"msg":msg},ensure_ascii=False), mimetype="text/plain")
 
     elif act=="d_del":
         oId = request.POST.get("id","")
         outd = get_object_or_404(OutDetail, id=oId)
-        outd.quantity=0
+        #flag = True
+        #尚缺出库删除后相应店铺历史销售数据逻辑错误判断
+        outs = outd.outid
+        if outs.log is None:
+            outs.log = ""
+        outs.log = u"%s %s 删除 产品：%s\n原:%s套 仓库%s\n%s\n"\
+        %(datetime.date.today(),request.user.get_profile().name,outd.product.name,outd.quantity,outd.depot.name,31*'-') + outs.log
+        outd.quantity = 0
         outd.save()
+        outs.save()
         return HttpResponse("done", mimetype="text/plain")
     
     else:
         url = ""
         outstream = ""
         if act == "detail":
-            page_title="出库详单"
-            outstream = get_object_or_404(OutStream, id=oId)
-            out = OutDetail.objects.filter(outid=outstream,quantity__gt=0).order_by("-id")
+            page_title="%s库详单"%tt
+            outstream = get_object_or_404(OutStream, id=oId, returned=rFlag)
+            out = OutDetail.objects.filter(outid=outstream).exclude(quantity=0).order_by("-id")
+            if  rFlag:
+                out = out.extra(select={"squantity":0})
             url = "act=%s&id=%s&"%(act,oId)
         else:
             if act == "search":
@@ -1044,16 +1145,16 @@ def ypsi_depots_out(request):
                 hide = request.GET.get("hidden","false")
 
                 if did == "0":
-                    outds = OutDetail.objects.filter(product=pid,quantity__gt=0)
+                    outds = OutDetail.objects.filter(product=pid,outid__returned=rFlag).exclude(quantity=0)
                 else:
-                    outds = OutDetail.objects.filter(product=pid,quantity__gt=0,depot=did)
+                    outds = OutDetail.objects.filter(product=pid,outid__returned=rFlag,depot=did).exclude(quantity=0)
                 if sid <> "0":
                     outds = outds.filter(outid__shop=get_object_or_404(Shop, id=sid))
                 if hide == "true":
                     out = OutStream.objects.filter(id__in=outds.values_list("outid")).order_by("-id")
                 else:
                     out = OutStream.objects.filter(id__in=outds.values_list("outid")).exclude(hidden=1).order_by("-id")
-                slist = OutDetail.objects.filter(outid__in=out,quantity__gt=0,product=oId).values("outid","product").annotate(tq=Sum("quantity")).order_by("-outid")
+                slist = OutDetail.objects.filter(outid__in=out,product=oId).exclude(quantity=0).values("outid","product").annotate(tq=Sum("quantity")).order_by("-outid")
 
                 for (o,q) in zip(out,slist):
                     o.pq = q["tq"]
@@ -1061,7 +1162,10 @@ def ypsi_depots_out(request):
 
                 url = "act=search&id=%s&did=%s&sid=%s&hidden=%s&"%(oId,did,sid,hide)
             else:
-                out = OutStream.objects.order_by("-id")
+                if rFlag:
+                    out = OutStream.objects.filter(returned=1).order_by("-id")
+                else:
+                    out = OutStream.objects.filter(returned=0).order_by("-id")
         paginator = Paginator(out, 20)
         after_range_num = 5      #当前页前显示5页
         befor_range_num = 4      #当前页后显示4页
@@ -1072,11 +1176,25 @@ def ypsi_depots_out(request):
         except ValueError:
             page = 1
         out_list = paginator.page(page)
+        if act == "detail" and rFlag:
+            shopId = outstream.shop_id
+            cursor = connection.cursor()
+            for od in out_list.object_list:
+                cursor.execute("select oQuantity-ifNull(sQuantity,0) as nQuantity from \
+                (select sum(quantity) as oQuantity,product_id as pid from PSI_OutDETAIL,psi_outStream  \
+                 where outId_id=psi_outStream.id and psi_outstream.hidden=0 and product_id=%s and shop_id=%s group by product_id ) \
+                left join \
+                (select psi_sellOrderDetail.product_id as sPid,sum(psi_sellOrderDetail.quantity) as sQuantity from psi_sellOrderDetail,psi_sellOrder \
+                where product_id=%s and hidden=0 and oid_id=psi_sellOrder.id and shop_id=%s group by psi_sellOrderDetail.product_id) \
+                on pid=sPid order by nQuantity desc",[od.product.id,shopId,od.product.id,shopId])
+                od.squantity = cursor.fetchone()[0]
+                od.save()
+            cursor.close()
         if page >= after_range_num:
             page_range = paginator.page_range[page-after_range_num:page+befor_range_num]
         else:
             page_range = paginator.page_range[0:int(page)+befor_range_num]
-        return render_to_response('app/depots_outstream.html',{"page_title":page_title,"out_list":out_list,"page_range":page_range,"rows":len(out),"outstream":outstream,"level":level,"url":url,"pname":pname,"ototal":ototal})
+        return render_to_response('app/depots_outstream.html',{"page_title":page_title,"out_list":out_list,"page_range":page_range,"rows":len(out),"outstream":outstream,"level":level,"url":url,"pname":pname,"ototal":ototal,"tt":tt})
 
 def ypsi_depots_remit(request):
     act = request.GET.get("act","list")
@@ -1307,7 +1425,6 @@ def ypsi_category(request):
                         if clist[i]['pId'] == c['id']:
                             clist[i]['pId'] = c_add.id
                 except Exception as error:
-                    #print error
                     continue
         return HttpResponse(simplejson.dumps({"flag":True}), mimetype='application/json')
     else:

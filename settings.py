@@ -106,6 +106,7 @@ MIDDLEWARE_CLASSES = (
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.csrf.CsrfResponseMiddleware',
     'django.middleware.locale.LocaleMiddleware',
+    'ypsi.middleware.threadlocals.ThreadLocals',
     #'django.middleware.transaction.TransactionMiddleware',
 )
 
